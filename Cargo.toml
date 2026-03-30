@@ -11,7 +11,7 @@ members = [
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/tokimo/tokimo-universal-im"
+repository = "https://github.com/tokimo-lab/tokimo-universal-im"
 
 [workspace.dependencies]
 tokimo-core = { path = "crates/tokimo-core" }
