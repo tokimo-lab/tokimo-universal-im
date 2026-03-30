@@ -2,6 +2,8 @@ use tokimo_core::{
     Platform, ImProvider,
     AuthService, MessagingService, ContactService, GroupService, CalendarService, TaskService,
     MeetingService, ChatListService, MediaService, MessageExtService, DocumentService,
+    WebhookService, EventService, DepartmentService, MeetingRoomService,
+    ApprovalService, AttendanceService, ReportService, DataTableService,
 };
 use crate::client::DingTalkClient;
 
@@ -72,5 +74,37 @@ impl ImProvider for DingTalkProvider {
 
     fn document(&self) -> Option<&dyn DocumentService> {
         None // DingTalk documents are not exposed via this CLI
+    }
+
+    fn webhook(&self) -> Option<&dyn WebhookService> {
+        Some(&self.client)
+    }
+
+    fn event(&self) -> Option<&dyn EventService> {
+        Some(&self.client)
+    }
+
+    fn department(&self) -> Option<&dyn DepartmentService> {
+        Some(&self.client)
+    }
+
+    fn meeting_room(&self) -> Option<&dyn MeetingRoomService> {
+        Some(&self.client)
+    }
+
+    fn approval(&self) -> Option<&dyn ApprovalService> {
+        Some(&self.client)
+    }
+
+    fn attendance(&self) -> Option<&dyn AttendanceService> {
+        Some(&self.client)
+    }
+
+    fn report(&self) -> Option<&dyn ReportService> {
+        Some(&self.client)
+    }
+
+    fn data_table(&self) -> Option<&dyn DataTableService> {
+        Some(&self.client)
     }
 }

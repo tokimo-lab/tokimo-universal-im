@@ -14,18 +14,17 @@
 ## 架构
 
 ```
-┌───────────────────────────────────────────────────────┐
-│               你的应用 / 通用客户端                       │
-├───────────────────────────────────────────────────────┤
-│                tokimo-core (traits + types)              │
-│   ImProvider / MessagingService / MeetingService / ...   │
-│   11 个服务 trait + 统一数据类型 + 统一错误处理              │
-├─────────────┬─────────────────┬───────────────────────┤
-│  tokimo-    │   tokimo-       │   tokimo-             │
-│  dingtalk   │   wecom         │   lark                │
-│  (钉钉)     │   (企业微信)      │   (飞书/Lark)          │
-│  6 服务      │   10 服务        │   11 服务              │
-└─────────────┴─────────────────┴───────────────────────┘
+┌────────────────────────────────────────────────────────┐
+│                你的应用 / 通用客户端                       │
+├────────────────────────────────────────────────────────┤
+│                 tokimo-core (traits + types)              │
+│    21 个服务 trait + 统一数据类型 + 统一错误处理              │
+├──────────────┬──────────────────┬──────────────────────┤
+│  tokimo-     │   tokimo-        │   tokimo-            │
+│  dingtalk    │   wecom          │   lark               │
+│  (钉钉)      │   (企业微信)       │   (飞书/Lark)         │
+│  14 服务      │   14 服务         │   19 服务             │
+└──────────────┴──────────────────┴──────────────────────┘
 ```
 
 ### Crate 说明
@@ -33,9 +32,9 @@
 | Crate | 说明 |
 |-------|------|
 | `tokimo-core` | 核心 trait 定义 + 统一数据类型，**所有客户端只需依赖此 crate** |
-| `tokimo-dingtalk` | 钉钉平台实现 (auth, messaging, contact, group, calendar, task) |
-| `tokimo-wecom` | 企业微信平台实现 (auth, messaging, contact, group, calendar, task, meeting, chat_list, media, document) |
-| `tokimo-lark` | 飞书/Lark 平台实现 (auth + 全部 10 个服务，功能最完整) |
+| `tokimo-dingtalk` | 钉钉平台实现 (14 服务: auth + messaging + contact + group + calendar + task + webhook + event + department + meeting_room + approval + attendance + report + data_table) |
+| `tokimo-wecom` | 企业微信平台实现 (14 服务: auth + messaging + contact + group + calendar + task + meeting + chat_list + media + document + webhook + event + department + data_table) |
+| `tokimo-lark` | 飞书/Lark 平台实现 (19 服务，功能最完整) |
 
 ---
 
@@ -63,16 +62,15 @@ use tokimo_lark::LarkProvider;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 1. 创建 provider
     let provider = LarkProvider::feishu("app_id", "app_secret");
 
-    // 2. 获取 token
-    let _token = provider.auth().get_access_token(&Credentials {
+    // 获取 token
+    provider.auth().get_access_token(&Credentials {
         client_id: "app_id".into(),
         client_secret: "app_secret".into(),
     }).await?;
 
-    // 3. 发送文本消息
+    // 发送文本消息
     let resp = provider.messaging().unwrap().send_message(SendMessageRequest {
         target: ChatTarget::Group("oc_xxxxx".into()),
         content: MessageContent::Text(TextContent {
@@ -83,7 +81,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         idempotency_key: None,
     }).await?;
     println!("Sent: {}", resp.message_id);
-
     Ok(())
 }
 ```
@@ -91,208 +88,163 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### 拉取历史消息
 
 ```rust
-use tokimo_core::*;
+let page = provider.messaging().unwrap().list_messages(ListMessagesRequest {
+    chat_id: "oc_xxxxx".into(),
+    chat_type: Some(ChatTypeHint::Group),
+    start_time: None, end_time: None,
+    cursor: None, limit: Some(50),
+}).await?;
 
-async fn pull_history(provider: &dyn ImProvider) -> ImResult<()> {
-    let messaging = provider.messaging().unwrap();
-
-    // 拉取群聊历史消息（支持分页）
-    let page = messaging.list_messages(ListMessagesRequest {
-        chat_id: "oc_xxxxx".into(),
-        chat_type: Some(ChatTypeHint::Group),
-        start_time: None,
-        end_time: None,
-        cursor: None,
-        limit: Some(50),
-    }).await?;
-
-    for msg in &page.items {
-        println!("[{}] {}: {:?}", msg.id, msg.sender.name, msg.content);
-    }
-
-    // 如果还有更多消息，继续分页
-    if page.has_more {
-        let _next = messaging.list_messages(ListMessagesRequest {
-            chat_id: "oc_xxxxx".into(),
-            chat_type: Some(ChatTypeHint::Group),
-            start_time: None,
-            end_time: None,
-            cursor: page.next_cursor.clone(),
-            limit: Some(50),
-        }).await?;
-    }
-
-    Ok(())
+for msg in &page.items {
+    println!("[{}] {}: {:?}", msg.id, msg.sender.name, msg.content);
 }
 ```
 
-### 消息回复、转发、表情回应（飞书）
+### Webhook 发送消息
 
 ```rust
-use tokimo_core::*;
+// 通过 Webhook 发送消息（钉钉/企微自定义机器人）
+provider.webhook().unwrap().send_webhook(WebhookMessageRequest {
+    webhook_url: "https://oapi.dingtalk.com/robot/send?access_token=xxx".into(),
+    content: MessageContent::Text(TextContent {
+        text: "服务告警：CPU 使用率超过 90%".into(),
+        mentions: vec![],
+    }),
+    secret: Some("SEC_xxx".into()), // 可选签名
+    at_user_ids: vec![],
+    at_all: true,
+}).await?;
+```
 
-async fn message_operations(provider: &dyn ImProvider) -> ImResult<()> {
-    let ext = provider.message_ext().ok_or(ImError::NotSupported {
-        feature: "message_ext".into(),
-        platform: provider.platform().to_string(),
-    })?;
+### 消息回复、转发、表情、置顶（飞书）
 
-    // 回复消息
-    ext.reply_message(ReplyMessageRequest {
-        reply_to_message_id: "om_xxxxx".into(),
-        content: MessageContent::Text(TextContent {
-            text: "收到，已处理！".into(),
-            mentions: vec![],
-        }),
-    }).await?;
+```rust
+let ext = provider.message_ext().unwrap();
 
-    // 转发消息到另一个群
-    ext.forward_message(ForwardMessageRequest {
-        message_id: "om_xxxxx".into(),
-        target: ChatTarget::Group("oc_yyyyy".into()),
-    }).await?;
+// 回复消息
+ext.reply_message(ReplyMessageRequest {
+    reply_to_message_id: "om_xxx".into(),
+    content: MessageContent::Text(TextContent { text: "收到！".into(), mentions: vec![] }),
+}).await?;
 
-    // 给消息添加表情回应
-    ext.add_reaction(AddReactionRequest {
-        message_id: "om_xxxxx".into(),
-        emoji_type: "THUMBSUP".into(),
-    }).await?;
+// 置顶消息
+ext.pin_message("om_xxx").await?;
 
-    // 查看消息已读状态
-    let status = ext.get_read_status("om_xxxxx").await?;
-    println!("已读: {}/{}", status.read_count, status.total_count);
+// 查看已读状态
+let status = ext.get_read_status("om_xxx").await?;
+println!("已读: {}/{}", status.read_count, status.total_count);
+```
 
-    // 批量获取消息
-    let _messages = ext.batch_get_messages(BatchGetMessagesRequest {
-        message_ids: vec!["om_aaa".into(), "om_bbb".into()],
-    }).await?;
+### 部门与组织架构
 
-    Ok(())
-}
+```rust
+let dept = provider.department().unwrap();
+
+// 列出根部门
+let depts = dept.list_departments(ListDepartmentsRequest {
+    parent_id: None, cursor: None, limit: Some(50),
+}).await?;
+
+// 获取部门成员
+let members = dept.list_department_members(ListDepartmentMembersRequest {
+    department_id: "dept_001".into(),
+    cursor: None, limit: Some(100),
+}).await?;
+```
+
+### 审批流程
+
+```rust
+let approval_svc = provider.approval().unwrap();
+
+// 发起审批
+let instance = approval_svc.create_approval(CreateApprovalRequest {
+    process_code: "PROC-xxx".into(),
+    initiator_id: "user_001".into(),
+    form_data: serde_json::json!({"reason": "出差申请", "days": 3}),
+    approvers: vec!["manager_001".into()],
+    cc_users: vec![],
+}).await?;
+
+// 审批通过
+approval_svc.action_approval(ApprovalActionRequest {
+    instance_id: instance.id.clone(),
+    action: ApprovalAction::Approve,
+    comment: Some("同意".into()),
+}).await?;
+```
+
+### 数据表 (AITable / Bitable / Smartsheet)
+
+```rust
+let dt = provider.data_table().unwrap();
+
+// 查询记录
+let records = dt.list_records(ListRecordsRequest {
+    base_id: "base_xxx".into(),
+    table_id: "tbl_xxx".into(),
+    view_id: None, filter: None, sort: None,
+    field_names: vec![], cursor: None, limit: Some(100),
+}).await?;
+
+// 写入记录
+dt.write_records(WriteRecordsRequest {
+    base_id: "base_xxx".into(),
+    table_id: "tbl_xxx".into(),
+    records: vec![DataRecordWrite {
+        id: None, // None = 新建, Some = 更新
+        fields: serde_json::json!({"名称": "新任务", "状态": "进行中"}),
+    }],
+}).await?;
 ```
 
 ### 会议管理
 
 ```rust
-use tokimo_core::*;
-
-async fn meeting_operations(provider: &dyn ImProvider) -> ImResult<()> {
-    let meeting_svc = provider.meeting().ok_or(ImError::NotSupported {
-        feature: "meeting".into(),
-        platform: provider.platform().to_string(),
-    })?;
-
-    // 创建会议
-    let meeting = meeting_svc.create_meeting(CreateMeetingRequest {
-        title: "周会".into(),
-        start_time: chrono::Utc::now(),
-        end_time: chrono::Utc::now() + chrono::Duration::hours(1),
-        attendees: vec!["user_id_1".into(), "user_id_2".into()],
-        settings: None,
-        description: Some("每周例会".into()),
-    }).await?;
-    println!("会议ID: {}", meeting.id);
-
-    // 列出会议
-    let _meetings = meeting_svc.list_meetings(ListMeetingsRequest {
-        start_time: None,
-        end_time: None,
-        cursor: None,
-        limit: Some(20),
-    }).await?;
-
-    // 取消会议
-    meeting_svc.cancel_meeting(&meeting.id).await?;
-
-    Ok(())
-}
+let meeting_svc = provider.meeting().unwrap();
+let meeting = meeting_svc.create_meeting(CreateMeetingRequest {
+    title: "周会".into(),
+    start_time: chrono::Utc::now(),
+    end_time: chrono::Utc::now() + chrono::Duration::hours(1),
+    attendees: vec!["user_1".into(), "user_2".into()],
+    settings: None, description: Some("每周例会".into()),
+}).await?;
 ```
 
-### 会话列表
+### Wiki 知识库（飞书）
 
 ```rust
-use tokimo_core::*;
+let wiki = provider.wiki().unwrap();
 
-async fn list_chats(provider: &dyn ImProvider) -> ImResult<()> {
-    let chat_list = provider.chat_list().ok_or(ImError::NotSupported {
-        feature: "chat_list".into(),
-        platform: provider.platform().to_string(),
-    })?;
+let spaces = wiki.list_spaces(ListWikiSpacesRequest {
+    cursor: None, limit: Some(20),
+}).await?;
 
-    let conversations = chat_list.list_conversations(ListConversationsRequest {
-        cursor: None,
-        limit: Some(50),
-    }).await?;
+let nodes = wiki.list_nodes(ListWikiNodesRequest {
+    space_id: "space_xxx".into(),
+    parent_node_id: None, cursor: None, limit: Some(50),
+}).await?;
 
-    for conv in &conversations.items {
-        println!("[{:?}] {} ({})", conv.conversation_type, conv.name, conv.id);
-    }
-
-    Ok(())
-}
+wiki.create_node(CreateWikiNodeRequest {
+    space_id: "space_xxx".into(),
+    parent_node_id: None,
+    node_type: "doc".into(),
+    title: "技术方案".into(),
+    content: Some("# 方案概述\n...".into()),
+}).await?;
 ```
 
-### 媒体文件上传/下载（飞书）
+### 邮件（飞书）
 
 ```rust
-use tokimo_core::*;
+let email_svc = provider.email().unwrap();
 
-async fn media_operations(provider: &dyn ImProvider) -> ImResult<()> {
-    let media = provider.media().ok_or(ImError::NotSupported {
-        feature: "media".into(),
-        platform: provider.platform().to_string(),
-    })?;
-
-    // 上传图片 → 获取 image_key
-    let image_data = std::fs::read("photo.jpg").unwrap();
-    let image_info = media.upload_image(image_data, "photo.jpg").await?;
-    println!("image_key: {}", image_info.media_id);
-
-    // 上传文件 → 获取 file_key
-    let file_data = std::fs::read("report.pdf").unwrap();
-    let file_info = media.upload_file(file_data, "report.pdf").await?;
-    println!("file_key: {}", file_info.media_id);
-
-    // 下载媒体
-    let content = media.download_media(&image_info.media_id).await?;
-    std::fs::write("downloaded.jpg", content).unwrap();
-
-    Ok(())
-}
-```
-
-### 文档管理
-
-```rust
-use tokimo_core::*;
-
-async fn document_operations(provider: &dyn ImProvider) -> ImResult<()> {
-    let doc_svc = provider.document().ok_or(ImError::NotSupported {
-        feature: "document".into(),
-        platform: provider.platform().to_string(),
-    })?;
-
-    // 创建文档
-    let doc = doc_svc.create_document(CreateDocumentRequest {
-        title: "项目方案".into(),
-        doc_type: DocumentType::Doc,
-        content: Some("# 项目方案\n\n## 背景\n...".into()),
-        folder_id: None,
-    }).await?;
-
-    // 获取文档
-    let _doc_info = doc_svc.get_document(&doc.id).await?;
-
-    // 搜索文档
-    let _results = doc_svc.search_documents(SearchDocumentRequest {
-        query: "项目方案".into(),
-        doc_type: None,
-        cursor: None,
-        limit: Some(10),
-    }).await?;
-
-    Ok(())
-}
+email_svc.send_email(SendEmailRequest {
+    subject: "项目进展".into(),
+    to: vec![EmailAddress { address: "user@example.com".into(), name: Some("张三".into()) }],
+    cc: vec![], bcc: vec![],
+    body: EmailBody { content_type: "text/html".into(), content: "<h1>本周进展</h1>...".into() },
+}).await?;
 ```
 
 ### 通用客户端模式（面向 trait 编程）
@@ -301,78 +253,39 @@ async fn document_operations(provider: &dyn ImProvider) -> ImResult<()> {
 use tokimo_core::*;
 
 /// 你的通用客户端只依赖 trait，不依赖具体平台
-async fn send_notification(
-    provider: &dyn ImProvider,
-    chat_id: &str,
-    text: &str,
-) -> ImResult<()> {
+async fn send_notification(provider: &dyn ImProvider, chat_id: &str, text: &str) -> ImResult<()> {
     let messaging = provider.messaging().ok_or_else(|| ImError::NotSupported {
         feature: "messaging".into(),
         platform: provider.platform().to_string(),
     })?;
-
     messaging.send_message(SendMessageRequest {
         target: ChatTarget::Group(chat_id.into()),
-        content: MessageContent::Text(TextContent {
-            text: text.into(),
-            mentions: vec![],
-        }),
-        bot_id: None,
-        idempotency_key: None,
+        content: MessageContent::Text(TextContent { text: text.into(), mentions: vec![] }),
+        bot_id: None, idempotency_key: None,
     }).await?;
-
     Ok(())
 }
 
-/// 优雅处理不同平台的功能差异（降级策略）
-async fn try_reply_or_send(
-    provider: &dyn ImProvider,
-    message_id: &str,
-    chat_id: &str,
-    text: &str,
-) -> ImResult<()> {
-    let content = MessageContent::Text(TextContent {
-        text: text.into(),
-        mentions: vec![],
-    });
-
-    // 优先尝试回复，不支持则降级为普通发送
+/// 优雅降级：优先回复，不支持则普通发送
+async fn try_reply(provider: &dyn ImProvider, msg_id: &str, chat_id: &str, text: &str) -> ImResult<()> {
+    let content = MessageContent::Text(TextContent { text: text.into(), mentions: vec![] });
     if let Some(ext) = provider.message_ext() {
         ext.reply_message(ReplyMessageRequest {
-            reply_to_message_id: message_id.into(),
-            content,
+            reply_to_message_id: msg_id.into(), content,
         }).await?;
-    } else if let Some(messaging) = provider.messaging() {
-        messaging.send_message(SendMessageRequest {
-            target: ChatTarget::Group(chat_id.into()),
-            content,
-            bot_id: None,
-            idempotency_key: None,
+    } else if let Some(m) = provider.messaging() {
+        m.send_message(SendMessageRequest {
+            target: ChatTarget::Group(chat_id.into()), content,
+            bot_id: None, idempotency_key: None,
         }).await?;
     }
-
     Ok(())
 }
 ```
 
 ---
 
-## 统一消息类型
-
-| MessageContent 枚举 | 说明 | 钉钉 | 企微 | 飞书 |
-|---------------------|------|:----:|:----:|:----:|
-| `Text` | 纯文本消息 | ✅ 发送 | ✅ 收发 | ✅ 收发 |
-| `Markdown` | 富文本 / Markdown | ✅ 发送 | ⚠️ 转为 text | ✅ 转为 post |
-| `Image` | 图片消息 | ✅ 发送(URL) | ✅ 接收 | ✅ 收发(image_key) |
-| `File` | 文件消息 | ❌ | ✅ 接收 | ✅ 收发(file_key) |
-| `Audio` | 语音消息 | ❌ | ✅ 接收 | ✅ 收发(file_key) |
-| `Video` | 视频消息 | ❌ | ✅ 接收 | ✅ 收发(file_key+cover) |
-| `Card` | 交互卡片 | ❌ | ❌ | ✅ 发送(interactive JSON) |
-| `Unknown` | 未知/平台特定类型 | — | — | — |
-
----
-
-## 功能实现状态 — 完整矩阵
+## 功能实现状态 — 完整矩阵 (21 服务)
 
 ### 服务总览
 
@@ -380,17 +293,27 @@ async fn try_reply_or_send(
 |:-:|-------------|------|:----:|:----:|:----:|
 | 1 | `AuthService` | 认证 | ✅ | ✅ | ✅ |
 | 2 | `MessagingService` | 消息收发 | ✅ | ✅ | ✅ |
-| 3 | `MessageExtService` | 回复/转发/表情/已读 | ❌ | ❌ | ✅ |
+| 3 | `MessageExtService` | 回复/转发/表情/已读/置顶 | ❌ | ❌ | ✅ |
 | 4 | `ContactService` | 通讯录 | ✅ | ✅ | ✅ |
-| 5 | `GroupService` | 群组管理 | ✅ | ⚠️ | ✅ |
+| 5 | `GroupService` | 群组管理+公告+Bot | ✅ | ⚠️ | ✅ |
 | 6 | `ChatListService` | 会话列表 | ❌ | ✅ | ✅ |
 | 7 | `CalendarService` | 日历/日程 | ✅ | ✅ | ✅ |
 | 8 | `TaskService` | 待办任务 | ✅ | ✅ | ✅ |
 | 9 | `MeetingService` | 会议管理 | ❌ | ✅ | ✅ |
 | 10 | `MediaService` | 文件上传/下载 | ❌ | ✅ | ✅ |
 | 11 | `DocumentService` | 文档管理 | ❌ | ✅ | ✅ |
+| 12 | `WebhookService` | Webhook 发送 | ✅ | ✅ | ❌ |
+| 13 | `EventService` | 事件订阅/回调 | ✅ | ✅ | ✅ |
+| 14 | `DepartmentService` | 部门/组织架构 | ✅ | ✅ | ✅ |
+| 15 | `MeetingRoomService` | 会议室预定 | ✅ | ❌ | ✅ |
+| 16 | `ApprovalService` | 审批/OA流程 | ✅ | ❌ | ✅ |
+| 17 | `AttendanceService` | 考勤打卡 | ✅ | ❌ | ✅ |
+| 18 | `ReportService` | 日报/周报 | ✅ | ❌ | ❌ |
+| 19 | `DataTableService` | 数据表 CRUD | ✅ | ✅ | ✅ |
+| 20 | `WikiService` | 知识库 | ❌ | ❌ | ✅ |
+| 21 | `EmailService` | 邮件 | ❌ | ❌ | ✅ |
 
-> ⚠️ = 部分支持（trait 已实现但方法返回 NotSupported）
+> ⚠️ = 部分支持 (trait 已实现但核心方法返回 NotSupported)
 
 ---
 
@@ -400,247 +323,240 @@ async fn try_reply_or_send(
 
 | 功能 | 钉钉 | 企微 | 飞书 |
 |------|:----:|:----:|:----:|
-| 获取 access_token | ✅ OAuth2 UserAccessToken | ✅ CorpToken | ✅ TenantAccessToken |
-| 刷新 token | ✅ refresh_token | ✅ 重新获取 | ✅ 重新获取 |
+| 获取 access_token | ✅ OAuth2 | ✅ CorpToken | ✅ TenantAccessToken |
+| 刷新 token | ✅ refresh | ✅ 重新获取 | ✅ 重新获取 |
 
-#### 2. 消息收发 (MessagingService) — 核心功能
+#### 2. 消息收发 (MessagingService)
 
 | 功能 | 钉钉 | 企微 | 飞书 |
 |------|:----:|:----:|:----:|
-| 发送文本消息（单聊） | ✅ Bot 批量单聊 | ✅ send_message | ✅ open_id |
-| 发送文本消息（群聊） | ✅ Bot 群聊 | ✅ send_message | ✅ chat_id |
-| 发送 Markdown 消息 | ✅ sampleMarkdown | ⚠️ 转为纯文本 | ✅ post 格式 |
-| 发送图片消息 | ✅ sampleImageMsg | ❌ | ✅ image_key |
-| 发送文件消息 | ❌ | ❌ | ✅ file_key |
-| 发送音频/视频消息 | ❌ | ❌ | ✅ |
-| 发送卡片消息 | ❌ | ❌ | ✅ interactive JSON |
-| **获取历史消息** | ⚠️ 无REST API | ✅ 7天 单/群 | ✅ 分页拉取 |
-| 撤回消息 | ✅ processQueryKey | ❌ | ✅ DELETE |
-
-> **关于拉取历史消息：**
-> - **企业微信**：`list_messages` 通过 `chat_type` 指定单聊(1)/群聊(2)，最多拉取7天内消息
-> - **飞书**：`list_messages` 通过 `container_id_type=chat` + `container_id` 分页拉取
-> - **钉钉**：REST API 不支持拉取历史消息，需通过 webhook/回调接收实时消息
+| 发送文本消息 | ✅ Bot | ✅ | ✅ |
+| 发送 Markdown | ✅ | ⚠️ 转text | ✅ post |
+| 发送图片/文件/音视频 | ⚠️ 仅图片 | ❌ | ✅ 全部 |
+| 发送卡片 | ❌ | ❌ | ✅ |
+| 获取历史消息 | ❌ | ✅ 7天 | ✅ 分页 |
+| 撤回消息 | ✅ | ❌ | ✅ |
 
 #### 3. 消息扩展 (MessageExtService) — 仅飞书
 
 | 功能 | 钉钉 | 企微 | 飞书 |
 |------|:----:|:----:|:----:|
-| 回复消息 | ❌ | ❌ | ✅ reply to message_id |
-| 转发消息 | ❌ | ❌ | ✅ forward to user/group |
-| 添加表情回应 | ❌ | ❌ | ✅ emoji reactions |
-| 删除表情回应 | ❌ | ❌ | ✅ |
-| 获取消息已读状态 | ❌ | ❌ | ✅ read_users + count |
-| 批量获取消息 | ❌ | ❌ | ✅ batch get by IDs |
+| 回复消息 | ❌ | ❌ | ✅ |
+| 转发消息 | ❌ | ❌ | ✅ |
+| 表情回应 | ❌ | ❌ | ✅ |
+| 已读状态 | ❌ | ❌ | ✅ |
+| 批量获取 | ❌ | ❌ | ✅ |
+| **消息置顶** | ❌ | ❌ | ✅ |
 
-#### 4. 通讯录 (ContactService)
+#### 4-5. 通讯录 + 群组
 
 | 功能 | 钉钉 | 企微 | 飞书 |
 |------|:----:|:----:|:----:|
 | 获取当前用户 | ✅ | ❌ | ✅ |
-| 搜索用户 | ✅ keyword | ✅ 列出可见联系人 | ✅ query |
-| 批量获取用户 | ✅ userIds | ❌ | ✅ 逐个获取 |
+| 搜索用户 | ✅ | ✅ | ✅ |
+| 创建/搜索/管理群 | ✅ | ❌ | ✅ |
+| 群公告 | 默认NotSupported | 默认NotSupported | 默认NotSupported |
+| 群Bot管理 | 默认NotSupported | 默认NotSupported | 默认NotSupported |
 
-#### 5. 群组管理 (GroupService)
-
-| 功能 | 钉钉 | 企微 | 飞书 |
-|------|:----:|:----:|:----:|
-| 创建群 | ✅ | ❌ | ✅ |
-| 搜索群 | ✅ | ❌ | ✅ |
-| 获取群信息 | ✅ | ❌ | ✅ |
-| 获取群成员 | ✅ | ❌ | ✅ |
-| 添加/移除成员 | ✅ | ❌ | ✅ |
-
-#### 6. 会话列表 (ChatListService)
+#### 6-8. 会话列表 + 日历 + 任务
 
 | 功能 | 钉钉 | 企微 | 飞书 |
 |------|:----:|:----:|:----:|
-| 列出会话 | ❌ | ✅ get_msg_chat_list | ✅ list chats |
+| 列出会话 | ❌ | ✅ | ✅ |
+| 日程 CRUD + 忙闲 | ✅ | ✅ | ✅ |
+| 任务 CRUD | ✅ | ✅ | ✅ |
 
-> 返回 `Conversation` 列表，包含 id、name、类型(单聊/群聊)
-
-#### 7. 日历/日程 (CalendarService)
-
-| 功能 | 钉钉 | 企微 | 飞书 |
-|------|:----:|:----:|:----:|
-| 创建日程 | ✅ | ✅ | ✅ |
-| 列出日程 | ✅ | ✅ | ✅ |
-| 获取日程详情 | ✅ | ✅ | ✅ |
-| 更新日程 | ✅ | ✅ | ✅ |
-| 删除日程 | ✅ | ✅ | ✅ |
-| 查询忙闲 | ✅ | ✅ | ✅ |
-
-#### 8. 待办任务 (TaskService)
+#### 9-11. 会议 + 媒体 + 文档
 
 | 功能 | 钉钉 | 企微 | 飞书 |
 |------|:----:|:----:|:----:|
-| 创建/列出/获取/更新/删除 | ✅ | ✅ | ✅ |
+| 会议 CRUD | ❌ | ✅ | ✅ VC API |
+| 图片/文件上传 | ❌ | ❌ | ✅ multipart |
+| 媒体下载 | ❌ | ✅ | ✅ |
+| 文档 CRUD | ❌ | ✅ | ✅ |
 
-#### 9. 会议管理 (MeetingService)
-
-| 功能 | 钉钉 | 企微 | 飞书 |
-|------|:----:|:----:|:----:|
-| 创建会议 | ❌ | ✅ | ✅ VC API |
-| 列出会议 | ❌ | ✅ | ✅ |
-| 获取会议详情 | ❌ | ✅ | ✅ |
-| 取消会议 | ❌ | ✅ | ❌ |
-| 更新会议成员 | ❌ | ✅ 添加/删除/静音 | ❌ |
-
-> **钉钉**：conference 标记为"即将支持"，暂无 REST API
-> **飞书**：通过 Video Conference (VC) API 实现
-
-#### 10. 媒体管理 (MediaService)
+#### 12. Webhook 发送 (WebhookService)
 
 | 功能 | 钉钉 | 企微 | 飞书 |
 |------|:----:|:----:|:----:|
-| 上传图片 | ❌ | ❌ | ✅ multipart form |
-| 上传文件 | ❌ | ❌ | ✅ multipart form |
-| 下载媒体 | ❌ | ✅ get_msg_media | ✅ resource download |
+| Webhook 发送 | ✅ HMAC签名 | ✅ URL鉴权 | ❌ |
+| 支持文本 | ✅ | ✅ | — |
+| 支持 Markdown | ✅ | ✅ | — |
+| @提及 | ✅ atUserIds | ✅ mentioned_list | — |
 
-> **企业微信**：`download_media` 返回媒体元信息（非二进制），需额外处理
-> **飞书**：上传返回 `image_key` / `file_key`，可直接用于消息发送
-
-#### 11. 文档管理 (DocumentService)
+#### 13. 事件订阅 (EventService)
 
 | 功能 | 钉钉 | 企微 | 飞书 |
 |------|:----:|:----:|:----:|
-| 创建文档 | ❌ | ✅ create_doc | ✅ create docx |
-| 获取文档 | ❌ | ✅ async轮询 | ✅ get |
-| 更新文档 | ❌ | ✅ edit_doc | ✅ raw content |
-| 搜索文档 | ❌ | ❌ | ✅ suite search |
+| 注册回调 | ✅ callback register | ✅ callback create | ⚠️ 需在控制台配置 |
+| 列出订阅 | ✅ | ✅ | ⚠️ |
+| 删除订阅 | ✅ | ✅ | ⚠️ |
+| 事件类型列表 | ✅ 静态列表 | ✅ 静态列表 | ✅ 静态列表 |
 
-> **企业微信**：`get_document` 是异步操作——先提交任务，再用 `task_id` 轮询结果
-> **钉钉**：文档功能（doc/drive）标记为"即将支持"
+> **飞书事件**: 飞书的事件订阅需在开发者控制台配置回调 URL 或使用 WebSocket 长连接
+
+#### 14. 部门管理 (DepartmentService)
+
+| 功能 | 钉钉 | 企微 | 飞书 |
+|------|:----:|:----:|:----:|
+| 列出子部门 | ✅ | ✅ | ✅ |
+| 获取部门详情 | ✅ | ✅ | ✅ |
+| 列出部门成员 | ✅ | ✅ | ✅ |
+
+#### 15. 会议室预定 (MeetingRoomService)
+
+| 功能 | 钉钉 | 企微 | 飞书 |
+|------|:----:|:----:|:----:|
+| 搜索会议室 | ✅ | ❌ | ✅ |
+| 获取会议室 | ✅ | ❌ | ✅ |
+| 预定会议室 | ✅ | ❌ | ⚠️ 通过日历 |
+| 取消预定 | ✅ | ❌ | ⚠️ 通过日历 |
+
+#### 16. 审批流程 (ApprovalService)
+
+| 功能 | 钉钉 | 企微 | 飞书 |
+|------|:----:|:----:|:----:|
+| 发起审批 | ✅ | ❌ | ✅ |
+| 列出审批 | ✅ | ❌ | ✅ |
+| 获取审批详情 | ✅ | ❌ | ✅ |
+| 审批/拒绝 | ✅ | ❌ | ✅ |
+
+#### 17. 考勤打卡 (AttendanceService)
+
+| 功能 | 钉钉 | 企微 | 飞书 |
+|------|:----:|:----:|:----:|
+| 查询打卡记录 | ✅ | ❌ | ✅ |
+| 查询班次 | ✅ | ❌ | ✅ |
+| 考勤汇总 | ✅ | ❌ | ✅ |
+
+#### 18. 日报/周报 (ReportService) — 仅钉钉
+
+| 功能 | 钉钉 | 企微 | 飞书 |
+|------|:----:|:----:|:----:|
+| 列出模板 | ✅ | ❌ | ❌ |
+| 创建日报 | ✅ | ❌ | ❌ |
+| 列出/获取日报 | ✅ | ❌ | ❌ |
+| 日报统计 | ✅ | ❌ | ❌ |
+
+#### 19. 数据表 (DataTableService)
+
+| 功能 | 钉钉 AITable | 企微 Smartsheet | 飞书 Bitable |
+|------|:----:|:----:|:----:|
+| Base CRUD | ✅ | ❌ | ✅ |
+| Table CRUD | ✅ | ❌ | ✅ |
+| Field/Column | ✅ | ✅ | ✅ |
+| Record 查询 | ✅ | ✅ | ✅ |
+| Record 写入 | ✅ | ✅ 500/批 | ✅ 自动分批 |
+| Record 删除 | ✅ | ✅ | ✅ |
+
+#### 20. 知识库 (WikiService) — 仅飞书
+
+| 功能 | 钉钉 | 企微 | 飞书 |
+|------|:----:|:----:|:----:|
+| 列出空间 | ❌ | ❌ | ✅ |
+| 列出/获取节点 | ❌ | ❌ | ✅ |
+| 创建节点 | ❌ | ❌ | ✅ |
+| 移动节点 | ❌ | ❌ | ✅ |
+| 搜索 | ❌ | ❌ | ✅ |
+
+#### 21. 邮件 (EmailService) — 仅飞书
+
+| 功能 | 钉钉 | 企微 | 飞书 |
+|------|:----:|:----:|:----:|
+| 发送邮件 | ❌ | ❌ | ✅ |
+| 列出/获取邮件 | ❌ | ❌ | ✅ |
+| 列出文件夹 | ❌ | ❌ | ✅ |
+| 标记已读 | ❌ | ❌ | ✅ |
+| 删除邮件 | ❌ | ❌ | ✅ |
 
 ---
 
-## 🔲 尚未实现的功能
+## 统一消息类型
 
-### 高优先级（推荐后续实现）
+| MessageContent 枚举 | 说明 | 钉钉 | 企微 | 飞书 |
+|---------------------|------|:----:|:----:|:----:|
+| `Text` | 纯文本 | ✅ 发送 | ✅ 收发 | ✅ 收发 |
+| `Markdown` | 富文本 | ✅ 发送 | ⚠️ 转text | ✅ post |
+| `Image` | 图片 | ✅ URL | ✅ 接收 | ✅ 收发 |
+| `File` | 文件 | ❌ | ✅ 接收 | ✅ 收发 |
+| `Audio` | 语音 | ❌ | ✅ 接收 | ✅ 收发 |
+| `Video` | 视频 | ❌ | ✅ 接收 | ✅ 收发 |
+| `Card` | 卡片 | ❌ | ❌ | ✅ 发送 |
+| `Unknown` | 平台特定 | — | — | — |
 
-| 功能域 | 具体功能 | 可用平台 | 备注 |
-|--------|----------|----------|------|
-| **事件** | WebSocket 实时事件订阅 | 飞书 | 实时接收消息的核心能力 |
-| **事件** | Webhook 回调 | 钉钉、企微 | 接收推送消息 |
-| **消息** | Webhook 发送 | 钉钉 | 自定义机器人 outgoing |
-| **消息** | 消息置顶 (Pin) | 飞书 | IM 常用功能 |
-| **消息** | DING 紧急提醒 | 钉钉 | 钉钉特色功能 |
+---
 
-### 中优先级
+## 核心数据类型一览
 
-| 功能域 | 具体功能 | 可用平台 | 备注 |
-|--------|----------|----------|------|
-| **群组** | 群公告 | 飞书 | 群管理常用 |
-| **群组** | 添加/移除机器人 | 钉钉 | 自动化 |
-| **通讯录** | 部门搜索/列表 | 钉钉 | 组织架构 |
-| **通讯录** | 批量获取部门成员 | 钉钉 | 批量操作 |
-| **日历** | 会议室管理 | 钉钉 | 资源预定 |
+### 消息 & 扩展
+`Message`, `MessageContent`, `SendMessageRequest`, `ListMessagesRequest`, `RecallMessageRequest`, `ReplyMessageRequest`, `ForwardMessageRequest`, `MessageReaction`, `AddReactionRequest`, `MessageReadStatus`, `BatchGetMessagesRequest`, `MessagePin`
 
-### 低优先级（平台特有）
+### Webhook & 事件
+`WebhookMessageRequest`, `WebhookMessageResponse`, `ImEvent`, `RegisterCallbackRequest`, `EventSubscription`
 
-| 功能域 | 具体功能 | 可用平台 | 备注 |
-|--------|----------|----------|------|
-| **数据表** | AITable / Base CRUD | 钉钉、飞书 | 结构化数据 |
-| **审批** | OA 审批流程 | 钉钉 | 企业流程 |
-| **考勤** | 打卡/班次 | 钉钉 | HR |
-| **日报** | 日志/日报 | 钉钉 | 工作汇报 |
-| **Wiki** | 知识库管理 | 飞书 | 文档协作 |
-| **邮件** | 邮件收发 | 飞书 | 邮箱集成 |
+### 组织架构
+`User`, `Department`, `DepartmentDetail`, `ListDepartmentsRequest`, `ListDepartmentMembersRequest`
+
+### 群组 & 会话
+`GroupChat`, `GroupMember`, `GroupAnnouncement`, `Conversation`, `ConversationType`
+
+### 日历 & 会议
+`CalendarEvent`, `EventAttendee`, `BusySlot`, `Meeting`, `MeetingRoom`, `SearchRoomRequest`, `BookRoomRequest`
+
+### 审批 & 考勤 & 日报
+`ApprovalInstance`, `ApprovalStatus`, `ApprovalAction`, `AttendanceRecord`, `AttendanceShift`, `AttendanceSummary`, `Report`, `ReportTemplate`, `ReportStatistics`
+
+### 数据表
+`DataBase`, `DataTable`, `DataField`, `DataRecord`, `DataRecordWrite`, `ListRecordsRequest`, `WriteRecordsRequest`
+
+### 知识库 & 邮件 & 文档
+`WikiSpace`, `WikiNode`, `Email`, `EmailAddress`, `EmailBody`, `Mailbox`, `Document`, `DocumentType`
+
+### 通用
+`Platform` (DingTalk/WeCom/Lark), `ChatTarget` (User/Group), `Page<T>`, `Credentials`, `AccessToken`, `ImError`, `MediaInfo`, `Task`
 
 ---
 
 ## 各平台认证方式
 
 ### 钉钉 (DingTalk)
-
 ```rust
 use tokimo_dingtalk::DingTalkProvider;
-
 let provider = DingTalkProvider::new("client_id", "client_secret");
-// OAuth2 device flow 获取用户级 token
-// 或企业内部应用 AppKey/AppSecret
 ```
 
 ### 企业微信 (WeCom)
-
 ```rust
 use tokimo_wecom::WeComProvider;
-
 let provider = WeComProvider::new("corp_id", "corp_secret");
-// corpid + corpsecret 获取 access_token
 ```
 
 ### 飞书 (Lark/Feishu)
-
 ```rust
 use tokimo_lark::LarkProvider;
-
-// 中国大陆 - Feishu
-let provider = LarkProvider::feishu("app_id", "app_secret");
-
-// 国际版 - Lark
-let provider = LarkProvider::lark("app_id", "app_secret");
+let provider = LarkProvider::feishu("app_id", "app_secret"); // 中国
+let provider = LarkProvider::lark("app_id", "app_secret");   // 国际
 ```
 
 ---
 
-## 核心数据类型一览
+## 扩展新平台
 
-### 消息相关
+实现 `ImProvider` trait 即可接入新平台。21 个服务中除 `auth()` 必需外，其余全部返回 `Option`——不支持的返回 `None` 即可：
 
-| 类型 | 说明 |
-|------|------|
-| `Message` | 统一消息 (id, chat_id, sender, content, timestamp, thread_id) |
-| `MessageContent` | 枚举: Text / Markdown / Image / File / Audio / Video / Card / Unknown |
-| `SendMessageRequest` | 发送请求 (target, content, bot_id, idempotency_key) |
-| `ListMessagesRequest` | 列出请求 (chat_id, chat_type, time range, cursor, limit) |
-| `RecallMessageRequest` | 撤回请求 (message_id, bot_id, chat_id) |
-| `ReplyMessageRequest` | 回复请求 (reply_to_message_id, content) |
-| `ForwardMessageRequest` | 转发请求 (message_id, target) |
-| `MessageReaction` | 表情回应 (reaction_id, emoji_type, user_id) |
-| `AddReactionRequest` | 添加回应 (message_id, emoji_type) |
-| `MessageReadStatus` | 已读状态 (read_users, total/read_count) |
-| `BatchGetMessagesRequest` | 批量获取 (message_ids) |
+```rust
+use tokimo_core::*;
 
-### 会议相关
+pub struct MyPlatformProvider { /* ... */ }
 
-| 类型 | 说明 |
-|------|------|
-| `Meeting` | 会议 (id, title, status, time range, host, attendees) |
-| `MeetingStatus` | Scheduled / InProgress / Ended / Cancelled |
-| `CreateMeetingRequest` | 创建请求 (title, time, attendees, settings) |
-| `ListMeetingsRequest` | 列出请求 (time range, cursor, limit) |
-
-### 会话/文档/媒体
-
-| 类型 | 说明 |
-|------|------|
-| `Conversation` | 会话 (id, name, type, last_message_time) |
-| `Document` | 文档 (id, title, doc_type, url, content) |
-| `MediaInfo` | 媒体信息 (media_id, media_type, size, name) |
-
-### 联系人/群组/日历/任务
-
-| 类型 | 说明 |
-|------|------|
-| `User` | 用户 (id, name, email, phone, avatar, departments) |
-| `Department` | 部门 (id, name, parent_id) |
-| `GroupChat` | 群组 (id, name, owner_id, member_count) |
-| `GroupMember` | 群成员 (user_id, name, role) |
-| `CalendarEvent` | 日程 (id, title, time, location, attendees) |
-| `Task` | 任务 (id, title, status, priority, due_time) |
-
-### 通用类型
-
-| 类型 | 说明 |
-|------|------|
-| `Platform` | DingTalk / WeCom / Lark |
-| `ChatTarget` | User(id) / Group(id) |
-| `ChatTypeHint` | Single / Group (用于 list_messages) |
-| `Page<T>` | 分页包装 (items, has_more, next_cursor) |
-| `Credentials` | 认证凭证 (client_id, client_secret) |
-| `AccessToken` | 令牌 (token, expires_at, refresh_token) |
-| `ImError` | 统一错误 (Auth / NotFound / RateLimited / Platform / NotSupported / ...) |
+impl ImProvider for MyPlatformProvider {
+    fn platform(&self) -> Platform { Platform::DingTalk /* placeholder */ }
+    fn auth(&self) -> &dyn AuthService { /* required */ }
+    fn messaging(&self) -> Option<&dyn MessagingService> { Some(/* ... */) }
+    fn contact(&self) -> Option<&dyn ContactService> { None }
+    // ... 其他 19 个服务默认返回 None
+}
+```
 
 ---
 
@@ -655,88 +571,72 @@ let provider = LarkProvider::lark("app_id", "app_secret");
 | **chrono** | 时间处理 |
 | **thiserror** | 错误类型 |
 | **tracing** | 日志 |
+| **hmac + sha2 + base64** | Webhook 签名 (钉钉) |
 
 ## 项目结构
 
 ```
 tokimo-universal-im/
-├── Cargo.toml                     # Workspace 配置
-├── README.md                      # 本文档
+├── Cargo.toml                       # Workspace 配置
+├── README.md                        # 本文档
 └── crates/
-    ├── tokimo-core/               # 核心 trait + 类型
+    ├── tokimo-core/                 # 核心 trait + 类型 (21 服务)
     │   └── src/
     │       ├── lib.rs
-    │       ├── error.rs           # ImError 统一错误
-    │       ├── types/
-    │       │   ├── common.rs      # Platform, Page, ChatTarget, Credentials
-    │       │   ├── message.rs     # Message, MessageContent, Reply/Forward/Reaction
-    │       │   ├── contact.rs     # User, Department
-    │       │   ├── group.rs       # GroupChat, GroupMember
-    │       │   ├── calendar.rs    # CalendarEvent, BusySlot
-    │       │   ├── task.rs        # Task, TaskStatus
-    │       │   ├── meeting.rs     # Meeting, MeetingStatus
-    │       │   ├── conversation.rs # Conversation, ConversationType
-    │       │   ├── document.rs    # Document, DocumentType
-    │       │   └── media.rs       # MediaInfo, MediaType
-    │       └── traits/
-    │           ├── provider.rs    # ImProvider (11 个服务入口)
-    │           ├── auth.rs        # AuthService
-    │           ├── messaging.rs   # MessagingService
-    │           ├── message_ext.rs # MessageExtService
-    │           ├── contact.rs     # ContactService
-    │           ├── group.rs       # GroupService
-    │           ├── chat_list.rs   # ChatListService
-    │           ├── calendar.rs    # CalendarService
-    │           ├── task.rs        # TaskService
-    │           ├── meeting.rs     # MeetingService
-    │           ├── media.rs       # MediaService
-    │           └── document.rs    # DocumentService
-    ├── tokimo-dingtalk/           # 钉钉 (6 服务)
-    │   └── src/
-    │       ├── client.rs          # HTTP 客户端
-    │       ├── auth.rs            # OAuth2 token
-    │       ├── messaging.rs       # Bot 消息
-    │       ├── contact.rs         # 联系人
-    │       ├── group.rs           # 群组
-    │       ├── calendar.rs        # 日历
-    │       ├── task.rs            # 任务
-    │       └── provider.rs        # DingTalkProvider
-    ├── tokimo-wecom/              # 企业微信 (10 服务)
-    │   └── src/
-    │       ├── client.rs          # HTTP 客户端
-    │       ├── auth.rs            # corpid/corpsecret
-    │       ├── messaging.rs       # 消息 + 历史记录 (7天)
-    │       ├── contact.rs         # 联系人
-    │       ├── group.rs           # 群组 (stub)
-    │       ├── calendar.rs        # 日程 + 忙闲
-    │       ├── task.rs            # 待办
-    │       ├── meeting.rs         # 会议 CRUD + 成员管理
-    │       ├── chat_list.rs       # 会话列表
-    │       ├── media.rs           # 媒体下载
-    │       ├── document.rs        # 文档 CRUD
-    │       └── provider.rs        # WeComProvider
-    └── tokimo-lark/               # 飞书 (11 服务, 最完整)
-        └── src/
-            ├── client.rs          # HTTP 客户端 (Feishu/Lark)
-            ├── auth.rs            # Tenant/User access token
-            ├── messaging.rs       # 全格式消息 + 撤回
-            ├── message_ext.rs     # 回复/转发/表情/已读/批量获取
-            ├── contact.rs         # 用户搜索
-            ├── group.rs           # 群组 CRUD + 成员
-            ├── chat_list.rs       # 会话列表
-            ├── calendar.rs        # 日历 + 忙闲
-            ├── task.rs            # 任务
-            ├── meeting.rs         # VC 会议
-            ├── media.rs           # 图片/文件上传 + 下载
-            ├── document.rs        # 文档 CRUD + 搜索
-            └── provider.rs        # LarkProvider
+    │       ├── error.rs             # ImError 统一错误
+    │       ├── types/               # 19 个类型模块
+    │       │   ├── common.rs        # Platform, Page, ChatTarget
+    │       │   ├── message.rs       # Message, Reply, Forward, Reaction, Pin
+    │       │   ├── contact.rs       # User, Department
+    │       │   ├── group.rs         # GroupChat, GroupMember
+    │       │   ├── calendar.rs      # CalendarEvent, BusySlot
+    │       │   ├── task.rs          # Task, TaskStatus
+    │       │   ├── meeting.ms       # Meeting
+    │       │   ├── meeting_room.rs  # MeetingRoom, SearchRoomRequest
+    │       │   ├── conversation.rs  # Conversation
+    │       │   ├── document.rs      # Document
+    │       │   ├── media.rs         # MediaInfo
+    │       │   ├── webhook.rs       # WebhookMessageRequest
+    │       │   ├── event.rs         # ImEvent, EventSubscription
+    │       │   ├── approval.rs      # ApprovalInstance, ApprovalAction
+    │       │   ├── attendance.rs    # AttendanceRecord, Shift, Summary
+    │       │   ├── report.rs        # Report, ReportTemplate
+    │       │   ├── data_table.rs    # DataBase, DataTable, DataRecord
+    │       │   ├── wiki.rs          # WikiSpace, WikiNode
+    │       │   ├── email.rs         # Email, Mailbox
+    │       │   └── extra.rs         # Pin, Announcement, Department extras
+    │       └── traits/              # 21 个 trait 模块
+    │           ├── provider.rs      # ImProvider (21 服务入口)
+    │           ├── auth.rs          # AuthService
+    │           ├── messaging.rs     # MessagingService
+    │           ├── message_ext.rs   # MessageExtService (+pin)
+    │           ├── contact.rs       # ContactService
+    │           ├── group.rs         # GroupService (+announcement, +bot)
+    │           ├── chat_list.rs     # ChatListService
+    │           ├── calendar.rs      # CalendarService
+    │           ├── task.rs          # TaskService
+    │           ├── meeting.rs       # MeetingService
+    │           ├── media.rs         # MediaService
+    │           ├── document.rs      # DocumentService
+    │           ├── webhook.rs       # WebhookService
+    │           ├── event.rs         # EventService
+    │           ├── department.rs    # DepartmentService
+    │           ├── meeting_room.rs  # MeetingRoomService
+    │           ├── approval.rs      # ApprovalService
+    │           ├── attendance.rs    # AttendanceService
+    │           ├── report.rs        # ReportService
+    │           ├── data_table.rs    # DataTableService
+    │           ├── wiki.rs          # WikiService
+    │           └── email.rs         # EmailService
+    ├── tokimo-dingtalk/             # 钉钉 (14 服务)
+    ├── tokimo-wecom/                # 企业微信 (14 服务)
+    └── tokimo-lark/                 # 飞书 (19 服务, 最完整)
 ```
 
 ## License
 
 Licensed under either of:
-
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT license ([LICENSE-MIT](LICENSE-MIT))
 
 at your option.

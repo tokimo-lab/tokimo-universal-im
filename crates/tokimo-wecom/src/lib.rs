@@ -13,6 +13,10 @@ mod meeting;
 mod chat_list;
 mod media;
 mod document;
+mod webhook;
+mod department;
+mod data_table;
+mod event;
 mod provider;
 
 pub use client::WeComClient;

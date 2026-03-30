@@ -15,7 +15,7 @@ pub trait ImProvider: Send + Sync {
     /// Messaging service (send / receive / recall).
     fn messaging(&self) -> Option<&dyn super::MessagingService>;
 
-    /// Extended messaging (reply, forward, reactions, read status).
+    /// Extended messaging (reply, forward, reactions, read status, pins).
     fn message_ext(&self) -> Option<&dyn super::MessageExtService>;
 
     /// Contact / address-book service.
@@ -41,4 +41,34 @@ pub trait ImProvider: Send + Sync {
 
     /// Document service.
     fn document(&self) -> Option<&dyn super::DocumentService>;
+
+    /// Webhook message sending service.
+    fn webhook(&self) -> Option<&dyn super::WebhookService> { None }
+
+    /// Real-time event subscription service.
+    fn event(&self) -> Option<&dyn super::EventService> { None }
+
+    /// Department / organizational structure service.
+    fn department(&self) -> Option<&dyn super::DepartmentService> { None }
+
+    /// Meeting room booking service.
+    fn meeting_room(&self) -> Option<&dyn super::MeetingRoomService> { None }
+
+    /// Approval / OA workflow service.
+    fn approval(&self) -> Option<&dyn super::ApprovalService> { None }
+
+    /// Attendance / check-in service.
+    fn attendance(&self) -> Option<&dyn super::AttendanceService> { None }
+
+    /// Report / daily / weekly service.
+    fn report(&self) -> Option<&dyn super::ReportService> { None }
+
+    /// Data table (AITable / Bitable / Smartsheet) service.
+    fn data_table(&self) -> Option<&dyn super::DataTableService> { None }
+
+    /// Wiki / knowledge base service.
+    fn wiki(&self) -> Option<&dyn super::WikiService> { None }
+
+    /// Email service.
+    fn email(&self) -> Option<&dyn super::EmailService> { None }
 }

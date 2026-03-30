@@ -14,6 +14,14 @@ mod chat_list;
 mod media;
 mod message_ext;
 mod document;
+mod department;
+mod meeting_room;
+mod approval;
+mod attendance;
+mod data_table;
+mod wiki;
+mod email;
+mod event;
 mod provider;
 
 pub use client::LarkClient;

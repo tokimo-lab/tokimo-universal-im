@@ -105,6 +105,22 @@ impl LarkClient {
             .map_err(|e| tokimo_core::ImError::Network(e.to_string()))
     }
 
+    pub(crate) async fn patch(
+        &self,
+        path: &str,
+        body: &impl serde::Serialize,
+    ) -> Result<reqwest::Response, tokimo_core::ImError> {
+        let token = self.token_or_err().await?;
+        let url = format!("{}{}", self.base_url, path);
+        self.http
+            .patch(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .json(body)
+            .send()
+            .await
+            .map_err(|e| tokimo_core::ImError::Network(e.to_string()))
+    }
+
     pub(crate) async fn put(
         &self,
         path: &str,

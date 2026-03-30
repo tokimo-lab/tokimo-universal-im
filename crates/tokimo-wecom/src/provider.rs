@@ -2,6 +2,7 @@ use tokimo_core::{
     Platform, ImProvider,
     AuthService, MessagingService, ContactService, GroupService, CalendarService, TaskService,
     MeetingService, ChatListService, MediaService, MessageExtService, DocumentService,
+    WebhookService, EventService, DepartmentService, DataTableService,
 };
 use crate::client::WeComClient;
 
@@ -68,6 +69,22 @@ impl ImProvider for WeComProvider {
     }
 
     fn document(&self) -> Option<&dyn DocumentService> {
+        Some(&self.client)
+    }
+
+    fn webhook(&self) -> Option<&dyn WebhookService> {
+        Some(&self.client)
+    }
+
+    fn event(&self) -> Option<&dyn EventService> {
+        Some(&self.client)
+    }
+
+    fn department(&self) -> Option<&dyn DepartmentService> {
+        Some(&self.client)
+    }
+
+    fn data_table(&self) -> Option<&dyn DataTableService> {
         Some(&self.client)
     }
 }

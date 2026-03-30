@@ -11,6 +11,14 @@ mod contact;
 mod group;
 mod calendar;
 mod task;
+mod webhook;
+mod department;
+mod meeting_room;
+mod approval;
+mod attendance;
+mod report;
+mod data_table;
+mod event;
 mod provider;
 
 pub use client::DingTalkClient;

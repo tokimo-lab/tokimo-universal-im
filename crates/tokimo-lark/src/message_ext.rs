@@ -5,7 +5,7 @@ use tokimo_core::{
     Message, SendMessageResponse,
     ReplyMessageRequest, ForwardMessageRequest,
     MessageReaction, AddReactionRequest, MessageReadStatus, ReadUser,
-    BatchGetMessagesRequest,
+    BatchGetMessagesRequest, MessagePin, Page,
 };
 use crate::client::LarkClient;
 use crate::messaging::build_content;
@@ -73,6 +73,28 @@ struct ReadItem {
 struct BatchData {
     #[serde(default)]
     items: Vec<serde_json::Value>,
+}
+
+#[derive(Deserialize)]
+struct PinData {
+    pin: Option<LarkPin>,
+}
+
+#[derive(Deserialize)]
+#[allow(dead_code)]
+struct LarkPin {
+    message_id: Option<String>,
+    chat_id: Option<String>,
+    operator_id: Option<String>,
+    create_time: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct PinListData {
+    #[serde(default)]
+    items: Vec<LarkPin>,
+    page_token: Option<String>,
+    has_more: Option<bool>,
 }
 
 #[async_trait]
@@ -237,5 +259,74 @@ impl MessageExtService for LarkClient {
             }
         }
         Ok(messages)
+    }
+
+    async fn pin_message(&self, message_id: &str) -> ImResult<MessagePin> {
+        let body = serde_json::json!({ "message_id": message_id });
+        let resp = self.post("/open-apis/im/v1/pins", &body).await?;
+        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let data: LarkResp<PinData> = serde_json::from_str(&text)?;
+        if data.code.unwrap_or(0) != 0 {
+            return Err(ImError::Platform {
+                code: data.code.unwrap_or(-1),
+                message: data.msg.unwrap_or(text),
+            });
+        }
+        let pin = data.data.and_then(|d| d.pin).ok_or_else(|| ImError::Internal("empty pin data".into()))?;
+        let created_at = pin.create_time.as_deref()
+            .and_then(|s| s.parse::<i64>().ok())
+            .and_then(|ts| chrono::DateTime::from_timestamp(ts, 0));
+        Ok(MessagePin {
+            pin_id: pin.message_id.clone().unwrap_or_default(),
+            message_id: pin.message_id.unwrap_or_else(|| message_id.to_string()),
+            chat_id: pin.chat_id.unwrap_or_default(),
+            operator_id: pin.operator_id,
+            created_at,
+        })
+    }
+
+    async fn unpin_message(&self, message_id: &str) -> ImResult<()> {
+        let path = format!("/open-apis/im/v1/pins/{}", message_id);
+        let resp = self.delete(&path).await?;
+        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let data: LarkResp<serde_json::Value> = serde_json::from_str(&text)?;
+        if data.code.unwrap_or(0) != 0 {
+            return Err(ImError::Platform {
+                code: data.code.unwrap_or(-1),
+                message: data.msg.unwrap_or(text),
+            });
+        }
+        Ok(())
+    }
+
+    async fn list_pins(&self, chat_id: &str) -> ImResult<Page<MessagePin>> {
+        let path = format!("/open-apis/im/v1/pins?chat_id={}", chat_id);
+        let resp = self.get(&path).await?;
+        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let data: LarkResp<PinListData> = serde_json::from_str(&text)?;
+        if data.code.unwrap_or(0) != 0 {
+            return Err(ImError::Platform {
+                code: data.code.unwrap_or(-1),
+                message: data.msg.unwrap_or(text),
+            });
+        }
+        let list = data.data.unwrap_or(PinListData { items: vec![], page_token: None, has_more: None });
+        let items: Vec<MessagePin> = list.items.into_iter().map(|pin| {
+            let created_at = pin.create_time.as_deref()
+                .and_then(|s| s.parse::<i64>().ok())
+                .and_then(|ts| chrono::DateTime::from_timestamp(ts, 0));
+            MessagePin {
+                pin_id: pin.message_id.clone().unwrap_or_default(),
+                message_id: pin.message_id.unwrap_or_default(),
+                chat_id: pin.chat_id.unwrap_or_else(|| chat_id.to_string()),
+                operator_id: pin.operator_id,
+                created_at,
+            }
+        }).collect();
+        Ok(Page {
+            items,
+            has_more: list.has_more.unwrap_or(false),
+            next_cursor: list.page_token,
+        })
     }
 }

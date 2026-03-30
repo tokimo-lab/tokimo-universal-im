@@ -2,6 +2,8 @@ use tokimo_core::{
     Platform, ImProvider,
     AuthService, MessagingService, ContactService, GroupService, CalendarService, TaskService,
     MeetingService, ChatListService, MediaService, MessageExtService, DocumentService,
+    EventService, DepartmentService, MeetingRoomService, ApprovalService, AttendanceService,
+    DataTableService, WikiService, EmailService,
 };
 use crate::client::{LarkClient, LarkRegion};
 
@@ -78,6 +80,38 @@ impl ImProvider for LarkProvider {
     }
 
     fn document(&self) -> Option<&dyn DocumentService> {
+        Some(&self.client)
+    }
+
+    fn event(&self) -> Option<&dyn EventService> {
+        Some(&self.client)
+    }
+
+    fn department(&self) -> Option<&dyn DepartmentService> {
+        Some(&self.client)
+    }
+
+    fn meeting_room(&self) -> Option<&dyn MeetingRoomService> {
+        Some(&self.client)
+    }
+
+    fn approval(&self) -> Option<&dyn ApprovalService> {
+        Some(&self.client)
+    }
+
+    fn attendance(&self) -> Option<&dyn AttendanceService> {
+        Some(&self.client)
+    }
+
+    fn data_table(&self) -> Option<&dyn DataTableService> {
+        Some(&self.client)
+    }
+
+    fn wiki(&self) -> Option<&dyn WikiService> {
+        Some(&self.client)
+    }
+
+    fn email(&self) -> Option<&dyn EmailService> {
         Some(&self.client)
     }
 }
