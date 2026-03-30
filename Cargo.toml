@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/tokimo-core",
+    "crates/tokimo-dingtalk",
+    "crates/tokimo-wecom",
+    "crates/tokimo-lark",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/tokimo/tokimo-universal-im"
+
+[workspace.dependencies]
+tokimo-core = { path = "crates/tokimo-core" }
+tokimo-dingtalk = { path = "crates/tokimo-dingtalk" }
+tokimo-wecom = { path = "crates/tokimo-wecom" }
+tokimo-lark = { path = "crates/tokimo-lark" }
+
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+async-trait = "0.1"
+thiserror = "2"
+tracing = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+url = "2"
+hmac = "0.12"
+sha2 = "0.10"
+base64 = "0.22"
