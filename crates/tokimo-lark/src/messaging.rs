@@ -30,7 +30,7 @@ struct ListData {
 }
 
 #[derive(Deserialize)]
-struct LarkMessage {
+pub(crate) struct LarkMessage {
     message_id: Option<String>,
     chat_id: Option<String>,
     msg_type: Option<String>,
@@ -116,7 +116,7 @@ impl From<LarkMessage> for Message {
     }
 }
 
-fn build_content(content: &MessageContent) -> ImResult<(&'static str, String)> {
+pub(crate) fn build_content(content: &MessageContent) -> ImResult<(&'static str, String)> {
     match content {
         MessageContent::Text(tc) => {
             Ok(("text", serde_json::json!({"text": tc.text}).to_string()))

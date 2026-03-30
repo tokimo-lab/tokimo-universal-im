@@ -9,6 +9,10 @@ mod contact;
 mod group;
 mod calendar;
 mod task;
+mod meeting;
+mod chat_list;
+mod media;
+mod document;
 mod provider;
 
 pub use client::WeComClient;

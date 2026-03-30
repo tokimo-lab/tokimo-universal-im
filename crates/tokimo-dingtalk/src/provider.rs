@@ -1,6 +1,7 @@
 use tokimo_core::{
     Platform, ImProvider,
     AuthService, MessagingService, ContactService, GroupService, CalendarService, TaskService,
+    MeetingService, ChatListService, MediaService, MessageExtService, DocumentService,
 };
 use crate::client::DingTalkClient;
 
@@ -37,6 +38,10 @@ impl ImProvider for DingTalkProvider {
         Some(&self.client)
     }
 
+    fn message_ext(&self) -> Option<&dyn MessageExtService> {
+        None // DingTalk doesn't support reply/forward/reactions via REST
+    }
+
     fn contact(&self) -> Option<&dyn ContactService> {
         Some(&self.client)
     }
@@ -45,11 +50,27 @@ impl ImProvider for DingTalkProvider {
         Some(&self.client)
     }
 
+    fn chat_list(&self) -> Option<&dyn ChatListService> {
+        None // DingTalk doesn't expose a chat list API via REST
+    }
+
     fn calendar(&self) -> Option<&dyn CalendarService> {
         Some(&self.client)
     }
 
     fn task(&self) -> Option<&dyn TaskService> {
         Some(&self.client)
+    }
+
+    fn meeting(&self) -> Option<&dyn MeetingService> {
+        None // DingTalk CLI doesn't expose meeting APIs
+    }
+
+    fn media(&self) -> Option<&dyn MediaService> {
+        None // DingTalk media is handled through AITable attachments
+    }
+
+    fn document(&self) -> Option<&dyn DocumentService> {
+        None // DingTalk documents are not exposed via this CLI
     }
 }

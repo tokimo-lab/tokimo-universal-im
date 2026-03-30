@@ -137,6 +137,16 @@ pub struct ListMessagesRequest {
     pub end_time: Option<chrono::DateTime<chrono::Utc>>,
     pub cursor: Option<String>,
     pub limit: Option<u32>,
+    /// Chat type hint for platforms that need it (e.g., WeCom: 1=single, 2=group).
+    pub chat_type: Option<ChatTypeHint>,
+}
+
+/// Hint about the chat type (needed by some platforms).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ChatTypeHint {
+    Single,
+    Group,
 }
 
 /// Parameters for recalling a message.
@@ -147,4 +157,63 @@ pub struct RecallMessageRequest {
     pub bot_id: Option<String>,
     /// Chat/group ID (required for some platforms).
     pub chat_id: Option<String>,
+}
+
+/// Parameters for replying to a specific message.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReplyMessageRequest {
+    /// The message ID to reply to.
+    pub reply_to_message_id: String,
+    /// Content of the reply.
+    pub content: MessageContent,
+    /// Bot ID (platform-specific).
+    pub bot_id: Option<String>,
+}
+
+/// Parameters for forwarding a message.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ForwardMessageRequest {
+    /// The message to forward.
+    pub message_id: String,
+    /// Where to forward it.
+    pub target: super::ChatTarget,
+}
+
+/// A reaction / emoji on a message.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MessageReaction {
+    pub reaction_id: String,
+    pub message_id: String,
+    pub emoji_type: String,
+    pub user_id: String,
+    pub timestamp: Option<i64>,
+}
+
+/// Parameters for adding a reaction to a message.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddReactionRequest {
+    pub message_id: String,
+    pub emoji_type: String,
+}
+
+/// Message read status info.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MessageReadStatus {
+    pub message_id: String,
+    pub read_users: Vec<ReadUser>,
+    pub total_count: u32,
+    pub read_count: u32,
+}
+
+/// A user who has read a message.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReadUser {
+    pub user_id: String,
+    pub read_at: Option<i64>,
+}
+
+/// Parameters for batch-fetching messages by IDs.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchGetMessagesRequest {
+    pub message_ids: Vec<String>,
 }

@@ -4,7 +4,7 @@ use tokimo_core::{
     MessagingService, ImResult, ImError,
     Message, MessageContent, MessageSender, TextContent,
     Page, SendMessageRequest, SendMessageResponse,
-    ListMessagesRequest, RecallMessageRequest, ChatTarget,
+    ListMessagesRequest, RecallMessageRequest, ChatTarget, ChatTypeHint,
 };
 use crate::client::WeComClient;
 
@@ -162,8 +162,14 @@ impl MessagingService for WeComClient {
         let start = req.start_time.map(|t| t.format("%Y-%m-%d %H:%M:%S").to_string()).unwrap_or_default();
         let end = req.end_time.map(|t| t.format("%Y-%m-%d %H:%M:%S").to_string()).unwrap_or_default();
 
+        let chat_type_int = match req.chat_type {
+            Some(ChatTypeHint::Single) => 1,
+            Some(ChatTypeHint::Group) => 2,
+            None => 2, // default to group
+        };
+
         let body = serde_json::json!({
-            "chat_type": 2, // default to group; adjust per use case
+            "chat_type": chat_type_int,
             "chatid": req.chat_id,
             "begin_time": start,
             "end_time": end,
