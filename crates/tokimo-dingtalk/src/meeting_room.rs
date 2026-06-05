@@ -1,10 +1,9 @@
+use crate::client::DingTalkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    MeetingRoomService, ImResult, ImError,
-    MeetingRoom, Page, SearchRoomRequest, BookRoomRequest,
+    BookRoomRequest, ImError, ImResult, MeetingRoom, MeetingRoomService, Page, SearchRoomRequest,
 };
-use crate::client::DingTalkClient;
 
 #[allow(dead_code)]
 #[derive(Deserialize)]
@@ -32,8 +31,12 @@ impl From<DtRoom> for MeetingRoom {
     fn from(r: DtRoom) -> Self {
         let location = r.room_location.map(|loc| {
             let mut parts = Vec::new();
-            if let Some(b) = loc.building_name { parts.push(b); }
-            if let Some(f) = loc.floor_name { parts.push(f); }
+            if let Some(b) = loc.building_name {
+                parts.push(b);
+            }
+            if let Some(f) = loc.floor_name {
+                parts.push(f);
+            }
             parts.join(" ")
         });
         MeetingRoom {
@@ -78,14 +81,22 @@ impl MeetingRoomService for DingTalkClient {
             body.insert("maxResults".into(), serde_json::json!(limit));
         }
 
-        let resp = self.post(
-            "/v1.0/calendar/rooms/search",
-            &serde_json::Value::Object(body),
-        ).await?;
+        let resp = self
+            .post(
+                "/v1.0/calendar/rooms/search",
+                &serde_json::Value::Object(body),
+            )
+            .await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let data: DtRoomListResponse = serde_json::from_str(&text)?;
         Ok(Page {
@@ -99,9 +110,15 @@ impl MeetingRoomService for DingTalkClient {
         let path = format!("/v1.0/calendar/rooms/{}", room_id);
         let resp = self.get(&path).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let r: DtRoom = serde_json::from_str(&text)?;
         Ok(r.into())
@@ -115,29 +132,47 @@ impl MeetingRoomService for DingTalkClient {
         let resp = self.post(&path, &body).await?;
         let status = resp.status();
         if !status.is_success() {
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         Ok(())
     }
 
     async fn cancel_room(&self, room_id: &str, event_id: &str) -> ImResult<()> {
-        let token = self.access_token.read().await.clone().ok_or_else(|| ImError::Auth {
-            message: "no access token".into(),
-        })?;
+        let token = self
+            .access_token
+            .read()
+            .await
+            .clone()
+            .ok_or_else(|| ImError::Auth {
+                message: "no access token".into(),
+            })?;
         let url = format!(
             "{}/v1.0/calendar/events/{}/rooms/{}",
             self.base_url, event_id, room_id
         );
-        let resp = self.http
+        let resp = self
+            .http
             .delete(&url)
             .header("x-acs-dingtalk-access-token", &token)
             .send()
             .await
             .map_err(|e| ImError::Network(e.to_string()))?;
         if !resp.status().is_success() {
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
-            return Err(ImError::Platform { code: 0, message: text });
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
+            return Err(ImError::Platform {
+                code: 0,
+                message: text,
+            });
         }
         Ok(())
     }

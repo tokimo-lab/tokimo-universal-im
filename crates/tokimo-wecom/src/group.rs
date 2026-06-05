@@ -1,10 +1,9 @@
+use crate::client::WeComClient;
 use async_trait::async_trait;
 use tokimo_core::{
-    GroupService, ImResult, ImError,
-    GroupChat, GroupMember, Page,
-    CreateGroupRequest, ModifyMembersRequest, SearchGroupRequest,
+    CreateGroupRequest, GroupChat, GroupMember, GroupService, ImError, ImResult,
+    ModifyMembersRequest, Page, SearchGroupRequest,
 };
-use crate::client::WeComClient;
 
 #[async_trait]
 impl GroupService for WeComClient {
@@ -30,7 +29,11 @@ impl GroupService for WeComClient {
         })
     }
 
-    async fn get_members(&self, _chat_id: &str, _cursor: Option<&str>) -> ImResult<Page<GroupMember>> {
+    async fn get_members(
+        &self,
+        _chat_id: &str,
+        _cursor: Option<&str>,
+    ) -> ImResult<Page<GroupMember>> {
         Err(ImError::NotSupported {
             feature: "get_members".into(),
             platform: "wecom".into(),

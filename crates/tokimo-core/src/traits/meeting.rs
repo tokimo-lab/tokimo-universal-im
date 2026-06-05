@@ -1,9 +1,8 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
 use crate::types::{
-    Meeting, Page,
-    CreateMeetingRequest, ListMeetingsRequest, UpdateMeetingMembersRequest,
+    CreateMeetingRequest, ListMeetingsRequest, Meeting, Page, UpdateMeetingMembersRequest,
 };
+use async_trait::async_trait;
 
 /// Meeting / video conference operations.
 #[async_trait]

@@ -1,12 +1,11 @@
+use crate::client::WeComClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    MessagingService, ImResult, ImError,
-    Message, MessageContent, MessageSender, TextContent,
-    Page, SendMessageRequest, SendMessageResponse,
-    ListMessagesRequest, RecallMessageRequest, ChatTarget, ChatTypeHint,
+    ChatTarget, ChatTypeHint, ImError, ImResult, ListMessagesRequest, Message, MessageContent,
+    MessageSender, MessagingService, Page, RecallMessageRequest, SendMessageRequest,
+    SendMessageResponse, TextContent,
 };
-use crate::client::WeComClient;
 
 #[derive(Deserialize)]
 struct WeComResponse {
@@ -68,12 +67,20 @@ impl From<RawMessage> for Message {
                 mentions: vec![],
             }),
             "image" => MessageContent::Image(tokimo_core::ImageContent {
-                media_key: m.image.as_ref().and_then(|i| i.media_id.clone()).unwrap_or_default(),
+                media_key: m
+                    .image
+                    .as_ref()
+                    .and_then(|i| i.media_id.clone())
+                    .unwrap_or_default(),
                 name: m.image.and_then(|i| i.name),
                 url: None,
             }),
             "file" => MessageContent::File(tokimo_core::FileContent {
-                media_key: m.file.as_ref().and_then(|f| f.media_id.clone()).unwrap_or_default(),
+                media_key: m
+                    .file
+                    .as_ref()
+                    .and_then(|f| f.media_id.clone())
+                    .unwrap_or_default(),
                 name: m.file.and_then(|f| f.name),
                 size: None,
                 mime_type: None,
@@ -83,7 +90,11 @@ impl From<RawMessage> for Message {
                 duration_ms: None,
             }),
             "video" => MessageContent::Video(tokimo_core::VideoContent {
-                media_key: m.video.as_ref().and_then(|v| v.media_id.clone()).unwrap_or_default(),
+                media_key: m
+                    .video
+                    .as_ref()
+                    .and_then(|v| v.media_id.clone())
+                    .unwrap_or_default(),
                 name: m.video.and_then(|v| v.name),
                 cover_key: None,
             }),
@@ -140,9 +151,15 @@ impl MessagingService for WeComClient {
 
         let resp = self.post("/cgi-bin/message/send", &body).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let data: WeComResponse = serde_json::from_str(&text)?;
         if data.errcode.unwrap_or(0) != 0 {
@@ -159,8 +176,14 @@ impl MessagingService for WeComClient {
     }
 
     async fn list_messages(&self, req: ListMessagesRequest) -> ImResult<Page<Message>> {
-        let start = req.start_time.map(|t| t.format("%Y-%m-%d %H:%M:%S").to_string()).unwrap_or_default();
-        let end = req.end_time.map(|t| t.format("%Y-%m-%d %H:%M:%S").to_string()).unwrap_or_default();
+        let start = req
+            .start_time
+            .map(|t| t.format("%Y-%m-%d %H:%M:%S").to_string())
+            .unwrap_or_default();
+        let end = req
+            .end_time
+            .map(|t| t.format("%Y-%m-%d %H:%M:%S").to_string())
+            .unwrap_or_default();
 
         let chat_type_int = match req.chat_type {
             Some(ChatTypeHint::Single) => 1,
@@ -178,9 +201,15 @@ impl MessagingService for WeComClient {
 
         let resp = self.post("/cgi-bin/message/get_message", &body).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let data: MessageListResponse = serde_json::from_str(&text)?;
         if data.errcode.unwrap_or(0) != 0 {

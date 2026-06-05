@@ -4,22 +4,22 @@
 //!
 //! Implements the core traits using DingTalk's Open Platform REST APIs.
 
-mod client;
-mod auth;
-mod messaging;
-mod contact;
-mod group;
-mod calendar;
-mod task;
-mod webhook;
-mod department;
-mod meeting_room;
 mod approval;
 mod attendance;
-mod report;
+mod auth;
+mod calendar;
+mod client;
+mod contact;
 mod data_table;
+mod department;
 mod event;
+mod group;
+mod meeting_room;
+mod messaging;
 mod provider;
+mod report;
+mod task;
+mod webhook;
 
 pub use client::DingTalkClient;
 pub use provider::DingTalkProvider;

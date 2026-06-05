@@ -1,11 +1,10 @@
+use crate::client::LarkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    TaskService, ImResult, ImError,
-    Task, TaskStatus, TaskPriority, Page,
-    CreateTaskRequest, UpdateTaskRequest, ListTasksRequest,
+    CreateTaskRequest, ImError, ImResult, ListTasksRequest, Page, Task, TaskPriority, TaskService,
+    TaskStatus, UpdateTaskRequest,
 };
-use crate::client::LarkClient;
 
 #[derive(Deserialize)]
 struct LarkResp<T> {
@@ -67,7 +66,11 @@ impl From<LarkTask> for Task {
             id: t.id.unwrap_or_default(),
             title: t.summary.unwrap_or_default(),
             description: t.description,
-            status: if t.completed_at.is_some() { TaskStatus::Done } else { TaskStatus::Pending },
+            status: if t.completed_at.is_some() {
+                TaskStatus::Done
+            } else {
+                TaskStatus::Pending
+            },
             priority: TaskPriority::Normal, // Lark tasks don't have priority via REST
             due_time: t.due.and_then(|d| d.timestamp).and_then(|s| ts_opt(&s)),
             assignees: t.members.into_iter().filter_map(|m| m.id).collect(),
@@ -89,7 +92,10 @@ impl TaskService for LarkClient {
             "members": req.assignee_ids.iter().map(|id| serde_json::json!({"id": id, "role": "assignee"})).collect::<Vec<_>>(),
         });
         let resp = self.post("/open-apis/task/v2/tasks", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<TaskData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -97,7 +103,10 @@ impl TaskService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let task = data.data.and_then(|d| d.task).ok_or_else(|| ImError::Internal("no task".into()))?;
+        let task = data
+            .data
+            .and_then(|d| d.task)
+            .ok_or_else(|| ImError::Internal("no task".into()))?;
         Ok(task.into())
     }
 
@@ -115,7 +124,10 @@ impl TaskService for LarkClient {
             path.push_str(&params.join("&"));
         }
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<ListTaskData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -123,7 +135,11 @@ impl TaskService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let list = data.data.unwrap_or(ListTaskData { items: vec![], page_token: None, has_more: None });
+        let list = data.data.unwrap_or(ListTaskData {
+            items: vec![],
+            page_token: None,
+            has_more: None,
+        });
         Ok(Page {
             items: list.items.into_iter().map(Into::into).collect(),
             has_more: list.has_more.unwrap_or(false),
@@ -134,7 +150,10 @@ impl TaskService for LarkClient {
     async fn get_task(&self, task_id: &str) -> ImResult<Task> {
         let path = format!("/open-apis/task/v2/tasks/{}", task_id);
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<TaskData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -142,24 +161,44 @@ impl TaskService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let task = data.data.and_then(|d| d.task).ok_or_else(|| ImError::NotFound { resource: task_id.into() })?;
+        let task = data
+            .data
+            .and_then(|d| d.task)
+            .ok_or_else(|| ImError::NotFound {
+                resource: task_id.into(),
+            })?;
         Ok(task.into())
     }
 
     async fn update_task(&self, req: UpdateTaskRequest) -> ImResult<Task> {
         let mut body = serde_json::Map::new();
-        if let Some(ref t) = req.title { body.insert("summary".into(), serde_json::json!(t)); }
-        if let Some(ref d) = req.description { body.insert("description".into(), serde_json::json!(d)); }
-        if let Some(ref due) = req.due_time { body.insert("due".into(), serde_json::json!({"timestamp": due.timestamp().to_string()})); }
+        if let Some(ref t) = req.title {
+            body.insert("summary".into(), serde_json::json!(t));
+        }
+        if let Some(ref d) = req.description {
+            body.insert("description".into(), serde_json::json!(d));
+        }
+        if let Some(ref due) = req.due_time {
+            body.insert(
+                "due".into(),
+                serde_json::json!({"timestamp": due.timestamp().to_string()}),
+            );
+        }
         if let Some(ref s) = req.status {
             if *s == TaskStatus::Done {
-                body.insert("completed_at".into(), serde_json::json!(chrono::Utc::now().timestamp().to_string()));
+                body.insert(
+                    "completed_at".into(),
+                    serde_json::json!(chrono::Utc::now().timestamp().to_string()),
+                );
             }
         }
 
         let path = format!("/open-apis/task/v2/tasks/{}", req.task_id);
         let resp = self.put(&path, &serde_json::Value::Object(body)).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<TaskData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -167,14 +206,20 @@ impl TaskService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let task = data.data.and_then(|d| d.task).ok_or_else(|| ImError::Internal("no task".into()))?;
+        let task = data
+            .data
+            .and_then(|d| d.task)
+            .ok_or_else(|| ImError::Internal("no task".into()))?;
         Ok(task.into())
     }
 
     async fn delete_task(&self, task_id: &str) -> ImResult<()> {
         let path = format!("/open-apis/task/v2/tasks/{}", task_id);
         let resp = self.delete(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<serde_json::Value> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {

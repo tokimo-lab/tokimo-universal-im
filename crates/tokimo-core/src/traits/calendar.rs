@@ -1,9 +1,9 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
 use crate::types::{
-    CalendarEvent, Page, BusySlot,
-    CreateEventRequest, UpdateEventRequest, ListEventsRequest, FreeBusyRequest,
+    BusySlot, CalendarEvent, CreateEventRequest, FreeBusyRequest, ListEventsRequest, Page,
+    UpdateEventRequest,
 };
+use async_trait::async_trait;
 
 /// Calendar / schedule operations.
 #[async_trait]

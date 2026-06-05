@@ -1,6 +1,6 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
 use crate::types::{AccessToken, Credentials};
+use async_trait::async_trait;
 
 /// Authentication operations.
 #[async_trait]

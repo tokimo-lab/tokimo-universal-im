@@ -1,6 +1,6 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
 use crate::types::{WebhookMessageRequest, WebhookMessageResponse};
+use async_trait::async_trait;
 
 /// Webhook-based message sending (custom bot webhooks).
 #[async_trait]

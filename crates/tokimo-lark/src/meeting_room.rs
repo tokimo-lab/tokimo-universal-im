@@ -1,10 +1,9 @@
+use crate::client::LarkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    MeetingRoomService, ImResult, ImError,
-    MeetingRoom, Page, SearchRoomRequest, BookRoomRequest,
+    BookRoomRequest, ImError, ImResult, MeetingRoom, MeetingRoomService, Page, SearchRoomRequest,
 };
-use crate::client::LarkClient;
 
 #[derive(Deserialize)]
 struct LarkResp<T> {
@@ -57,7 +56,10 @@ impl MeetingRoomService for LarkClient {
             "page_token": req.cursor.unwrap_or_default(),
         });
         let resp = self.post("/open-apis/vc/v1/rooms/search", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<RoomListData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -65,7 +67,11 @@ impl MeetingRoomService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let list = data.data.unwrap_or(RoomListData { rooms: vec![], page_token: None, has_more: None });
+        let list = data.data.unwrap_or(RoomListData {
+            rooms: vec![],
+            page_token: None,
+            has_more: None,
+        });
         Ok(Page {
             items: list.rooms.into_iter().map(Into::into).collect(),
             has_more: list.has_more.unwrap_or(false),
@@ -76,7 +82,10 @@ impl MeetingRoomService for LarkClient {
     async fn get_room(&self, room_id: &str) -> ImResult<MeetingRoom> {
         let path = format!("/open-apis/vc/v1/rooms/{}", room_id);
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<RoomData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -84,9 +93,12 @@ impl MeetingRoomService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let room = data.data.and_then(|d| d.room).ok_or_else(|| ImError::NotFound {
-            resource: room_id.into(),
-        })?;
+        let room = data
+            .data
+            .and_then(|d| d.room)
+            .ok_or_else(|| ImError::NotFound {
+                resource: room_id.into(),
+            })?;
         Ok(room.into())
     }
 

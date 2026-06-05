@@ -1,7 +1,7 @@
+use crate::client::LarkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
-use tokimo_core::{AuthService, ImResult, ImError, AccessToken, Credentials};
-use crate::client::LarkClient;
+use tokimo_core::{AccessToken, AuthService, Credentials, ImError, ImResult};
 
 #[derive(Deserialize)]
 struct TenantTokenResp {
@@ -21,7 +21,10 @@ impl AuthService for LarkClient {
         let resp = self
             .post_no_auth("/open-apis/auth/v3/tenant_access_token/internal", &body)
             .await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: TenantTokenResp = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Auth {
@@ -32,9 +35,9 @@ impl AuthService for LarkClient {
             message: "no tenant_access_token in response".into(),
         })?;
         self.set_token(token_str.clone(), false).await;
-        let expires_at = data.expire.map(|secs| {
-            chrono::Utc::now() + chrono::Duration::seconds(secs)
-        });
+        let expires_at = data
+            .expire
+            .map(|secs| chrono::Utc::now() + chrono::Duration::seconds(secs));
         Ok(AccessToken {
             token: token_str,
             expires_at,
@@ -47,6 +50,7 @@ impl AuthService for LarkClient {
         self.get_access_token(&Credentials {
             client_id: self.app_id.clone(),
             client_secret: self.app_secret.clone(),
-        }).await
+        })
+        .await
     }
 }

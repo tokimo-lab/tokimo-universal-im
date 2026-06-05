@@ -1,11 +1,10 @@
+use crate::client::DingTalkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    AttendanceService, ImResult, ImError,
-    AttendanceRecord, AttendanceShift, AttendanceSummary, CheckType, AttendanceResult, Page,
-    ListAttendanceRequest,
+    AttendanceRecord, AttendanceResult, AttendanceService, AttendanceShift, AttendanceSummary,
+    CheckType, ImError, ImResult, ListAttendanceRequest, Page,
 };
-use crate::client::DingTalkClient;
 
 #[allow(dead_code)]
 #[derive(Deserialize)]
@@ -48,9 +47,9 @@ fn parse_dt_time(s: &str) -> Option<chrono::DateTime<chrono::Utc>> {
         .ok()
         .map(|dt| dt.with_timezone(&chrono::Utc))
         .or_else(|| {
-            s.parse::<i64>().ok().and_then(|ms| {
-                chrono::DateTime::from_timestamp_millis(ms)
-            })
+            s.parse::<i64>()
+                .ok()
+                .and_then(chrono::DateTime::from_timestamp_millis)
         })
 }
 
@@ -60,9 +59,17 @@ impl From<DtAttendanceRecord> for AttendanceRecord {
             id: r.id.unwrap_or_default(),
             user_id: r.user_id.unwrap_or_default(),
             user_name: r.user_name,
-            check_type: r.check_type.as_deref().map(parse_check_type).unwrap_or(CheckType::CheckIn),
+            check_type: r
+                .check_type
+                .as_deref()
+                .map(parse_check_type)
+                .unwrap_or(CheckType::CheckIn),
             check_time: r.user_check_time.as_deref().and_then(parse_dt_time),
-            result: r.time_result.as_deref().map(parse_attendance_result).unwrap_or(AttendanceResult::Normal),
+            result: r
+                .time_result
+                .as_deref()
+                .map(parse_attendance_result)
+                .unwrap_or(AttendanceResult::Normal),
             location: r.location_result,
         }
     }
@@ -124,9 +131,15 @@ impl AttendanceService for DingTalkClient {
         });
         let resp = self.post("/v1.0/attendance/records/query", &body).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let data: DtAttendanceListResponse = serde_json::from_str(&text)?;
         Ok(Page {
@@ -149,16 +162,26 @@ impl AttendanceService for DingTalkClient {
         });
         let resp = self.post("/v1.0/attendance/shifts/query", &body).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let data: DtShiftListResponse = serde_json::from_str(&text)?;
-        Ok(data.list.into_iter().map(|s| AttendanceShift {
-            id: s.id.unwrap_or_default(),
-            name: s.name.unwrap_or_default(),
-            schedule: s.sections,
-        }).collect())
+        Ok(data
+            .list
+            .into_iter()
+            .map(|s| AttendanceShift {
+                id: s.id.unwrap_or_default(),
+                name: s.name.unwrap_or_default(),
+                schedule: s.sections,
+            })
+            .collect())
     }
 
     async fn get_summary(
@@ -174,9 +197,15 @@ impl AttendanceService for DingTalkClient {
         });
         let resp = self.post("/v1.0/attendance/records/summary", &body).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let s: DtSummary = serde_json::from_str(&text)?;
         Ok(AttendanceSummary {

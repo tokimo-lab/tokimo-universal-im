@@ -1,10 +1,7 @@
+use crate::client::LarkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
-use tokimo_core::{
-    ContactService, ImResult, ImError,
-    User, Page, SearchUserRequest, Department,
-};
-use crate::client::LarkClient;
+use tokimo_core::{ContactService, Department, ImError, ImResult, Page, SearchUserRequest, User};
 
 #[derive(Deserialize)]
 struct LarkResp<T> {
@@ -55,11 +52,15 @@ impl From<LarkUser> for User {
             email: u.email,
             phone: u.mobile,
             avatar: u.avatar.and_then(|a| a.avatar_72),
-            departments: u.department_ids.into_iter().map(|id| Department {
-                id,
-                name: String::new(),
-                parent_id: None,
-            }).collect(),
+            departments: u
+                .department_ids
+                .into_iter()
+                .map(|id| Department {
+                    id,
+                    name: String::new(),
+                    parent_id: None,
+                })
+                .collect(),
             extra: serde_json::Value::Null,
         }
     }
@@ -69,7 +70,10 @@ impl From<LarkUser> for User {
 impl ContactService for LarkClient {
     async fn get_self(&self) -> ImResult<User> {
         let resp = self.get("/open-apis/authen/v1/user_info").await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<UserInfoData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -77,7 +81,9 @@ impl ContactService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let u = data.data.ok_or_else(|| ImError::Internal("empty user data".into()))?;
+        let u = data
+            .data
+            .ok_or_else(|| ImError::Internal("empty user data".into()))?;
         Ok(User {
             id: u.user_id.unwrap_or_default(),
             name: u.name.unwrap_or_default(),
@@ -96,7 +102,10 @@ impl ContactService for LarkClient {
             "page_token": req.cursor.unwrap_or_default(),
         });
         let resp = self.post("/open-apis/search/v1/user", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<SearchData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -104,7 +113,11 @@ impl ContactService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let search = data.data.unwrap_or(SearchData { users: vec![], page_token: None, has_more: None });
+        let search = data.data.unwrap_or(SearchData {
+            users: vec![],
+            page_token: None,
+            has_more: None,
+        });
         Ok(Page {
             items: search.users.into_iter().map(Into::into).collect(),
             has_more: search.has_more.unwrap_or(false),
@@ -117,7 +130,10 @@ impl ContactService for LarkClient {
         for id in user_ids {
             let path = format!("/open-apis/contact/v3/users/{}?user_id_type=open_id", id);
             let resp = self.get(&path).await?;
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
             let data: LarkResp<serde_json::Value> = serde_json::from_str(&text)?;
             if let Some(user_val) = data.data.and_then(|d| d.get("user").cloned()) {
                 let u: LarkUser = serde_json::from_value(user_val)?;

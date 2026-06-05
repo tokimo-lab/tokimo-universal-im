@@ -1,11 +1,10 @@
+use crate::client::DingTalkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    ApprovalService, ImResult, ImError,
-    ApprovalInstance, ApprovalStatus, ApprovalAction, Page,
-    CreateApprovalRequest, ListApprovalRequest, ApprovalActionRequest,
+    ApprovalAction, ApprovalActionRequest, ApprovalInstance, ApprovalService, ApprovalStatus,
+    CreateApprovalRequest, ImError, ImResult, ListApprovalRequest, Page,
 };
-use crate::client::DingTalkClient;
 
 #[allow(dead_code)]
 #[derive(Deserialize)]
@@ -41,9 +40,9 @@ fn parse_dt_time(s: &str) -> Option<chrono::DateTime<chrono::Utc>> {
         .ok()
         .map(|dt| dt.with_timezone(&chrono::Utc))
         .or_else(|| {
-            s.parse::<i64>().ok().and_then(|ms| {
-                chrono::DateTime::from_timestamp_millis(ms)
-            })
+            s.parse::<i64>()
+                .ok()
+                .and_then(chrono::DateTime::from_timestamp_millis)
         })
 }
 
@@ -53,7 +52,11 @@ impl From<DtApprovalInstance> for ApprovalInstance {
             id: a.instance_id.unwrap_or_default(),
             process_code: a.process_code.unwrap_or_default(),
             title: a.title.unwrap_or_default(),
-            status: a.status.as_deref().map(parse_status).unwrap_or(ApprovalStatus::Pending),
+            status: a
+                .status
+                .as_deref()
+                .map(parse_status)
+                .unwrap_or(ApprovalStatus::Pending),
             initiator_id: a.originator_user_id.unwrap_or_default(),
             form_data: a.form_component_values.unwrap_or(serde_json::Value::Null),
             created_at: a.create_time.as_deref().and_then(parse_dt_time),
@@ -92,9 +95,15 @@ impl ApprovalService for DingTalkClient {
         });
         let resp = self.post("/v1.0/workflow/processInstances", &body).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let created: DtCreateApprovalResponse = serde_json::from_str(&text)?;
         let instance_id = created.instance_id.unwrap_or_default();
@@ -121,14 +130,22 @@ impl ApprovalService for DingTalkClient {
             body.insert("maxResults".into(), serde_json::json!(limit));
         }
 
-        let resp = self.post(
-            "/v1.0/workflow/processInstances/query",
-            &serde_json::Value::Object(body),
-        ).await?;
+        let resp = self
+            .post(
+                "/v1.0/workflow/processInstances/query",
+                &serde_json::Value::Object(body),
+            )
+            .await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let data: DtApprovalListResponse = serde_json::from_str(&text)?;
         Ok(Page {
@@ -142,9 +159,15 @@ impl ApprovalService for DingTalkClient {
         let path = format!("/v1.0/workflow/processInstances/{}", instance_id);
         let resp = self.get(&path).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let a: DtApprovalInstance = serde_json::from_str(&text)?;
         Ok(a.into())
@@ -167,8 +190,14 @@ impl ApprovalService for DingTalkClient {
         let resp = self.post(&path, &serde_json::Value::Object(body)).await?;
         let status = resp.status();
         if !status.is_success() {
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         Ok(())
     }

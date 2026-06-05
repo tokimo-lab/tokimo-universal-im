@@ -1,6 +1,6 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
 use crate::types::MediaInfo;
+use async_trait::async_trait;
 
 /// Media upload / download operations.
 ///

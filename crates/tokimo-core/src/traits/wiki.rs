@@ -1,10 +1,9 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
 use crate::types::{
-    WikiSpace, WikiNode, Page,
-    ListWikiSpacesRequest, ListWikiNodesRequest,
-    CreateWikiNodeRequest, MoveWikiNodeRequest, SearchWikiRequest,
+    CreateWikiNodeRequest, ListWikiNodesRequest, ListWikiSpacesRequest, MoveWikiNodeRequest, Page,
+    SearchWikiRequest, WikiNode, WikiSpace,
 };
+use async_trait::async_trait;
 
 /// Wiki / knowledge base management.
 #[async_trait]

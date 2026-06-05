@@ -1,13 +1,15 @@
+use crate::client::LarkClient;
 use async_trait::async_trait;
 use tokimo_core::{
-    EventService, ImResult, ImError,
-    ImEvent, RegisterCallbackRequest, EventSubscription,
+    EventService, EventSubscription, ImError, ImEvent, ImResult, RegisterCallbackRequest,
 };
-use crate::client::LarkClient;
 
 #[async_trait]
 impl EventService for LarkClient {
-    async fn register_callback(&self, _req: RegisterCallbackRequest) -> ImResult<EventSubscription> {
+    async fn register_callback(
+        &self,
+        _req: RegisterCallbackRequest,
+    ) -> ImResult<EventSubscription> {
         Err(ImError::NotSupported {
             feature: "register_callback (configure callback URL in Lark developer console)".into(),
             platform: "lark".into(),

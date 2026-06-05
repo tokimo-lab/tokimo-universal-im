@@ -43,32 +43,52 @@ pub trait ImProvider: Send + Sync {
     fn document(&self) -> Option<&dyn super::DocumentService>;
 
     /// Webhook message sending service.
-    fn webhook(&self) -> Option<&dyn super::WebhookService> { None }
+    fn webhook(&self) -> Option<&dyn super::WebhookService> {
+        None
+    }
 
     /// Real-time event subscription service.
-    fn event(&self) -> Option<&dyn super::EventService> { None }
+    fn event(&self) -> Option<&dyn super::EventService> {
+        None
+    }
 
     /// Department / organizational structure service.
-    fn department(&self) -> Option<&dyn super::DepartmentService> { None }
+    fn department(&self) -> Option<&dyn super::DepartmentService> {
+        None
+    }
 
     /// Meeting room booking service.
-    fn meeting_room(&self) -> Option<&dyn super::MeetingRoomService> { None }
+    fn meeting_room(&self) -> Option<&dyn super::MeetingRoomService> {
+        None
+    }
 
     /// Approval / OA workflow service.
-    fn approval(&self) -> Option<&dyn super::ApprovalService> { None }
+    fn approval(&self) -> Option<&dyn super::ApprovalService> {
+        None
+    }
 
     /// Attendance / check-in service.
-    fn attendance(&self) -> Option<&dyn super::AttendanceService> { None }
+    fn attendance(&self) -> Option<&dyn super::AttendanceService> {
+        None
+    }
 
     /// Report / daily / weekly service.
-    fn report(&self) -> Option<&dyn super::ReportService> { None }
+    fn report(&self) -> Option<&dyn super::ReportService> {
+        None
+    }
 
     /// Data table (AITable / Bitable / Smartsheet) service.
-    fn data_table(&self) -> Option<&dyn super::DataTableService> { None }
+    fn data_table(&self) -> Option<&dyn super::DataTableService> {
+        None
+    }
 
     /// Wiki / knowledge base service.
-    fn wiki(&self) -> Option<&dyn super::WikiService> { None }
+    fn wiki(&self) -> Option<&dyn super::WikiService> {
+        None
+    }
 
     /// Email service.
-    fn email(&self) -> Option<&dyn super::EmailService> { None }
+    fn email(&self) -> Option<&dyn super::EmailService> {
+        None
+    }
 }

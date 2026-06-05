@@ -1,11 +1,10 @@
+use crate::client::DingTalkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    GroupService, ImResult, ImError,
-    GroupChat, GroupMember, MemberRole, Page,
-    CreateGroupRequest, ModifyMembersRequest, SearchGroupRequest,
+    CreateGroupRequest, GroupChat, GroupMember, GroupService, ImError, ImResult, MemberRole,
+    ModifyMembersRequest, Page, SearchGroupRequest,
 };
-use crate::client::DingTalkClient;
 
 #[derive(Deserialize)]
 struct DtGroup {
@@ -40,9 +39,15 @@ impl GroupService for DingTalkClient {
         });
         let resp = self.post("/v1.0/im/interconnections/groups", &body).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let g: DtGroup = serde_json::from_str(&text)?;
         Ok(g.into())
@@ -53,17 +58,30 @@ impl GroupService for DingTalkClient {
             "query": req.keyword,
             "cursor": req.cursor.unwrap_or_default(),
         });
-        let resp = self.post("/v1.0/im/interconnections/groups/search", &body).await?;
+        let resp = self
+            .post("/v1.0/im/interconnections/groups/search", &body)
+            .await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let val: serde_json::Value = serde_json::from_str(&text)?;
         let groups: Vec<DtGroup> = serde_json::from_value(
-            val.get("records").cloned().unwrap_or(serde_json::Value::Array(vec![]))
+            val.get("records")
+                .cloned()
+                .unwrap_or(serde_json::Value::Array(vec![])),
         )?;
-        let next_cursor = val.get("nextCursor").and_then(|v| v.as_str()).map(String::from);
+        let next_cursor = val
+            .get("nextCursor")
+            .and_then(|v| v.as_str())
+            .map(String::from);
         let has_more = next_cursor.is_some();
         Ok(Page {
             items: groups.into_iter().map(Into::into).collect(),
@@ -77,37 +95,63 @@ impl GroupService for DingTalkClient {
             .get(&format!("/v1.0/im/interconnections/groups/{}", chat_id))
             .await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let g: DtGroup = serde_json::from_str(&text)?;
         Ok(g.into())
     }
 
-    async fn get_members(&self, chat_id: &str, cursor: Option<&str>) -> ImResult<Page<GroupMember>> {
+    async fn get_members(
+        &self,
+        chat_id: &str,
+        cursor: Option<&str>,
+    ) -> ImResult<Page<GroupMember>> {
         let body = serde_json::json!({
             "openConversationId": chat_id,
             "cursor": cursor.unwrap_or(""),
         });
-        let resp = self.post("/v1.0/im/interconnections/groups/members", &body).await?;
+        let resp = self
+            .post("/v1.0/im/interconnections/groups/members", &body)
+            .await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let val: serde_json::Value = serde_json::from_str(&text)?;
         let members: Vec<serde_json::Value> = serde_json::from_value(
-            val.get("memberUserIds").cloned().unwrap_or(serde_json::Value::Array(vec![]))
+            val.get("memberUserIds")
+                .cloned()
+                .unwrap_or(serde_json::Value::Array(vec![])),
         )?;
-        let items: Vec<GroupMember> = members.iter().filter_map(|m| {
-            m.as_str().map(|id| GroupMember {
-                user_id: id.to_string(),
-                name: None,
-                role: MemberRole::Member,
+        let items: Vec<GroupMember> = members
+            .iter()
+            .filter_map(|m| {
+                m.as_str().map(|id| GroupMember {
+                    user_id: id.to_string(),
+                    name: None,
+                    role: MemberRole::Member,
+                })
             })
-        }).collect();
-        let next_cursor = val.get("nextCursor").and_then(|v| v.as_str()).map(String::from);
+            .collect();
+        let next_cursor = val
+            .get("nextCursor")
+            .and_then(|v| v.as_str())
+            .map(String::from);
         Ok(Page {
             has_more: next_cursor.is_some(),
             items,
@@ -120,10 +164,18 @@ impl GroupService for DingTalkClient {
             "openConversationId": req.chat_id,
             "userIds": req.user_ids,
         });
-        let resp = self.post("/v1.0/im/interconnections/groups/members/add", &body).await?;
+        let resp = self
+            .post("/v1.0/im/interconnections/groups/members/add", &body)
+            .await?;
         if !resp.status().is_success() {
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
-            return Err(ImError::Platform { code: 0, message: text });
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
+            return Err(ImError::Platform {
+                code: 0,
+                message: text,
+            });
         }
         Ok(())
     }
@@ -133,10 +185,18 @@ impl GroupService for DingTalkClient {
             "openConversationId": req.chat_id,
             "userIds": req.user_ids,
         });
-        let resp = self.post("/v1.0/im/interconnections/groups/members/remove", &body).await?;
+        let resp = self
+            .post("/v1.0/im/interconnections/groups/members/remove", &body)
+            .await?;
         if !resp.status().is_success() {
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
-            return Err(ImError::Platform { code: 0, message: text });
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
+            return Err(ImError::Platform {
+                code: 0,
+                message: text,
+            });
         }
         Ok(())
     }

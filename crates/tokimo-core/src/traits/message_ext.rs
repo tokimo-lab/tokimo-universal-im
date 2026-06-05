@@ -1,10 +1,9 @@
-use async_trait::async_trait;
-use crate::error::{ImResult, ImError};
+use crate::error::{ImError, ImResult};
 use crate::types::{
-    SendMessageResponse, ReplyMessageRequest, ForwardMessageRequest,
-    MessageReaction, AddReactionRequest, MessageReadStatus,
-    Message, BatchGetMessagesRequest, MessagePin, Page,
+    AddReactionRequest, BatchGetMessagesRequest, ForwardMessageRequest, Message, MessagePin,
+    MessageReaction, MessageReadStatus, Page, ReplyMessageRequest, SendMessageResponse,
 };
+use async_trait::async_trait;
 
 /// Extended messaging operations beyond basic send/receive/recall.
 ///
@@ -35,18 +34,27 @@ pub trait MessageExtService: Send + Sync {
     /// Pin a message in a chat.
     async fn pin_message(&self, message_id: &str) -> ImResult<MessagePin> {
         let _ = message_id;
-        Err(ImError::NotSupported { feature: "pin_message".into(), platform: "unknown".into() })
+        Err(ImError::NotSupported {
+            feature: "pin_message".into(),
+            platform: "unknown".into(),
+        })
     }
 
     /// Unpin a message.
     async fn unpin_message(&self, message_id: &str) -> ImResult<()> {
         let _ = message_id;
-        Err(ImError::NotSupported { feature: "unpin_message".into(), platform: "unknown".into() })
+        Err(ImError::NotSupported {
+            feature: "unpin_message".into(),
+            platform: "unknown".into(),
+        })
     }
 
     /// List pinned messages in a chat.
     async fn list_pins(&self, chat_id: &str) -> ImResult<Page<MessagePin>> {
         let _ = chat_id;
-        Err(ImError::NotSupported { feature: "list_pins".into(), platform: "unknown".into() })
+        Err(ImError::NotSupported {
+            feature: "list_pins".into(),
+            platform: "unknown".into(),
+        })
     }
 }

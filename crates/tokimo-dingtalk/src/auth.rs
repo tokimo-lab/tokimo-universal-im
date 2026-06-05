@@ -1,7 +1,7 @@
+use crate::client::DingTalkClient;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tokimo_core::{AuthService, ImResult, ImError, AccessToken, Credentials};
-use crate::client::DingTalkClient;
+use tokimo_core::{AccessToken, AuthService, Credentials, ImError, ImResult};
 
 #[derive(Serialize)]
 struct TokenRequest<'a> {
@@ -38,7 +38,10 @@ impl AuthService for DingTalkClient {
             .post_no_auth("/v1.0/oauth2/userAccessToken", &body)
             .await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
             return Err(ImError::Auth { message: text });
         }
@@ -48,9 +51,9 @@ impl AuthService for DingTalkClient {
         })?;
         // Cache the token
         self.set_token(token_str.clone()).await;
-        let expires_at = data.expire_in.map(|secs| {
-            chrono::Utc::now() + chrono::Duration::seconds(secs)
-        });
+        let expires_at = data
+            .expire_in
+            .map(|secs| chrono::Utc::now() + chrono::Duration::seconds(secs));
         Ok(AccessToken {
             token: token_str,
             expires_at,
@@ -69,7 +72,10 @@ impl AuthService for DingTalkClient {
             .post_no_auth("/v1.0/oauth2/userAccessToken", &body)
             .await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
             return Err(ImError::Auth { message: text });
         }
@@ -78,9 +84,9 @@ impl AuthService for DingTalkClient {
             message: "no access_token in refresh response".into(),
         })?;
         self.set_token(token_str.clone()).await;
-        let expires_at = data.expire_in.map(|secs| {
-            chrono::Utc::now() + chrono::Duration::seconds(secs)
-        });
+        let expires_at = data
+            .expire_in
+            .map(|secs| chrono::Utc::now() + chrono::Duration::seconds(secs));
         Ok(AccessToken {
             token: token_str,
             expires_at,

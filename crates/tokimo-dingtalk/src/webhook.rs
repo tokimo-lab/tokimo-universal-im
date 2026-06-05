@@ -1,11 +1,11 @@
+use crate::client::DingTalkClient;
 use async_trait::async_trait;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
 use tokimo_core::{
-    WebhookService, ImResult, ImError,
-    WebhookMessageRequest, WebhookMessageResponse, MessageContent,
+    ImError, ImResult, MessageContent, WebhookMessageRequest, WebhookMessageResponse,
+    WebhookService,
 };
-use crate::client::DingTalkClient;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -20,7 +20,10 @@ fn sign_url(webhook_url: &str, secret: &str) -> Result<String, ImError> {
     let sign_encoded = url::form_urlencoded::byte_serialize(sign.as_bytes()).collect::<String>();
 
     let sep = if webhook_url.contains('?') { "&" } else { "?" };
-    Ok(format!("{}{}&timestamp={}&sign={}", webhook_url, sep, timestamp, sign_encoded))
+    Ok(format!(
+        "{}{}&timestamp={}&sign={}",
+        webhook_url, sep, timestamp, sign_encoded
+    ))
 }
 
 fn build_body(content: &MessageContent, at_user_ids: &[String], at_all: bool) -> serde_json::Value {
@@ -69,7 +72,8 @@ impl WebhookService for DingTalkClient {
 
         let body = build_body(&req.content, &req.at_user_ids, req.at_all);
 
-        let resp = self.http
+        let resp = self
+            .http
             .post(&url)
             .json(&body)
             .send()
@@ -77,7 +81,10 @@ impl WebhookService for DingTalkClient {
             .map_err(|e| ImError::Network(e.to_string()))?;
 
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
 
         let val: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
         let errcode = val.get("errcode").and_then(|v| v.as_i64()).unwrap_or(0);

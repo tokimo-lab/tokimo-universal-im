@@ -1,11 +1,10 @@
-use tokimo_core::{
-    Platform, ImProvider,
-    AuthService, MessagingService, ContactService, GroupService, CalendarService, TaskService,
-    MeetingService, ChatListService, MediaService, MessageExtService, DocumentService,
-    EventService, DepartmentService, MeetingRoomService, ApprovalService, AttendanceService,
-    DataTableService, WikiService, EmailService,
-};
 use crate::client::{LarkClient, LarkRegion};
+use tokimo_core::{
+    ApprovalService, AttendanceService, AuthService, CalendarService, ChatListService,
+    ContactService, DataTableService, DepartmentService, DocumentService, EmailService,
+    EventService, GroupService, ImProvider, MediaService, MeetingRoomService, MeetingService,
+    MessageExtService, MessagingService, Platform, TaskService, WikiService,
+};
 
 /// Lark/Feishu (飞书) platform provider.
 pub struct LarkProvider {
@@ -13,7 +12,11 @@ pub struct LarkProvider {
 }
 
 impl LarkProvider {
-    pub fn new(app_id: impl Into<String>, app_secret: impl Into<String>, region: LarkRegion) -> Self {
+    pub fn new(
+        app_id: impl Into<String>,
+        app_secret: impl Into<String>,
+        region: LarkRegion,
+    ) -> Self {
         Self {
             client: LarkClient::new(app_id, app_secret, region),
         }

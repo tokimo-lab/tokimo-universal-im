@@ -1,6 +1,6 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
-use crate::types::{User, Page, SearchUserRequest};
+use crate::types::{Page, SearchUserRequest, User};
+use async_trait::async_trait;
 
 /// Contact / address book operations.
 #[async_trait]

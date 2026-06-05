@@ -1,10 +1,7 @@
+use crate::client::WeComClient;
 use async_trait::async_trait;
 use serde::Deserialize;
-use tokimo_core::{
-    MediaService, ImResult, ImError,
-    MediaInfo,
-};
-use crate::client::WeComClient;
+use tokimo_core::{ImError, ImResult, MediaInfo, MediaService};
 
 #[derive(Deserialize)]
 struct MediaResp {
@@ -40,10 +37,17 @@ impl MediaService for WeComClient {
         })
     }
 
-    async fn download_media(&self, media_key: &str, _message_id: Option<&str>) -> ImResult<Vec<u8>> {
+    async fn download_media(
+        &self,
+        media_key: &str,
+        _message_id: Option<&str>,
+    ) -> ImResult<Vec<u8>> {
         let body = serde_json::json!({ "media_id": media_key });
         let resp = self.post("/cgi-bin/message/get_media", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: MediaResp = serde_json::from_str(&text)?;
         if data.errcode.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -65,6 +69,7 @@ impl MediaService for WeComClient {
             "local_path": info.local_path,
             "size": info.size,
             "content_type": info.content_type,
-        })).unwrap_or_default())
+        }))
+        .unwrap_or_default())
     }
 }

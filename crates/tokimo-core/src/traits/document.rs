@@ -1,9 +1,8 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
 use crate::types::{
-    Document, Page,
-    CreateDocumentRequest, UpdateDocumentRequest, SearchDocumentRequest,
+    CreateDocumentRequest, Document, Page, SearchDocumentRequest, UpdateDocumentRequest,
 };
+use async_trait::async_trait;
 
 /// Document operations (create, read, edit, search).
 #[async_trait]

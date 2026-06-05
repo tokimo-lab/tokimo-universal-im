@@ -1,11 +1,10 @@
+use crate::client::LarkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    GroupService, ImResult, ImError,
-    GroupChat, GroupMember, MemberRole, Page,
-    CreateGroupRequest, ModifyMembersRequest, SearchGroupRequest,
+    CreateGroupRequest, GroupChat, GroupMember, GroupService, ImError, ImResult, MemberRole,
+    ModifyMembersRequest, Page, SearchGroupRequest,
 };
-use crate::client::LarkClient;
 
 #[derive(Deserialize)]
 struct LarkResp<T> {
@@ -73,8 +72,13 @@ impl GroupService for LarkClient {
             "description": req.description,
             "user_id_list": req.member_ids,
         });
-        let resp = self.post("/open-apis/im/v1/chats?user_id_type=open_id", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let resp = self
+            .post("/open-apis/im/v1/chats?user_id_type=open_id", &body)
+            .await?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<CreateChatData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -99,8 +103,13 @@ impl GroupService for LarkClient {
             "page_size": req.limit.unwrap_or(20),
             "page_token": req.cursor.unwrap_or_default(),
         });
-        let resp = self.post("/open-apis/im/v2/chats/search?user_id_type=open_id", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let resp = self
+            .post("/open-apis/im/v2/chats/search?user_id_type=open_id", &body)
+            .await?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<ChatListData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -108,7 +117,11 @@ impl GroupService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let list = data.data.unwrap_or(ChatListData { items: vec![], page_token: None, has_more: None });
+        let list = data.data.unwrap_or(ChatListData {
+            items: vec![],
+            page_token: None,
+            has_more: None,
+        });
         Ok(Page {
             items: list.items.into_iter().map(Into::into).collect(),
             has_more: list.has_more.unwrap_or(false),
@@ -119,7 +132,10 @@ impl GroupService for LarkClient {
     async fn get_group(&self, chat_id: &str) -> ImResult<GroupChat> {
         let path = format!("/open-apis/im/v1/chats/{}?user_id_type=open_id", chat_id);
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<LarkChat> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -127,17 +143,29 @@ impl GroupService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let chat = data.data.ok_or_else(|| ImError::NotFound { resource: chat_id.into() })?;
+        let chat = data.data.ok_or_else(|| ImError::NotFound {
+            resource: chat_id.into(),
+        })?;
         Ok(chat.into())
     }
 
-    async fn get_members(&self, chat_id: &str, cursor: Option<&str>) -> ImResult<Page<GroupMember>> {
-        let mut path = format!("/open-apis/im/v1/chats/{}/members?member_id_type=open_id", chat_id);
+    async fn get_members(
+        &self,
+        chat_id: &str,
+        cursor: Option<&str>,
+    ) -> ImResult<Page<GroupMember>> {
+        let mut path = format!(
+            "/open-apis/im/v1/chats/{}/members?member_id_type=open_id",
+            chat_id
+        );
         if let Some(c) = cursor {
             path.push_str(&format!("&page_token={}", c));
         }
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<MemberListData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -145,13 +173,21 @@ impl GroupService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let list = data.data.unwrap_or(MemberListData { items: vec![], page_token: None, has_more: None });
+        let list = data.data.unwrap_or(MemberListData {
+            items: vec![],
+            page_token: None,
+            has_more: None,
+        });
         Ok(Page {
-            items: list.items.into_iter().map(|m| GroupMember {
-                user_id: m.member_id.unwrap_or_default(),
-                name: m.name,
-                role: MemberRole::Member,
-            }).collect(),
+            items: list
+                .items
+                .into_iter()
+                .map(|m| GroupMember {
+                    user_id: m.member_id.unwrap_or_default(),
+                    name: m.name,
+                    role: MemberRole::Member,
+                })
+                .collect(),
             has_more: list.has_more.unwrap_or(false),
             next_cursor: list.page_token,
         })
@@ -161,9 +197,15 @@ impl GroupService for LarkClient {
         let body = serde_json::json!({
             "id_list": req.user_ids,
         });
-        let path = format!("/open-apis/im/v1/chats/{}/members?member_id_type=open_id", req.chat_id);
+        let path = format!(
+            "/open-apis/im/v1/chats/{}/members?member_id_type=open_id",
+            req.chat_id
+        );
         let resp = self.post(&path, &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<serde_json::Value> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -178,9 +220,15 @@ impl GroupService for LarkClient {
         let _body = serde_json::json!({
             "id_list": req.user_ids,
         });
-        let path = format!("/open-apis/im/v1/chats/{}/members?member_id_type=open_id", req.chat_id);
+        let path = format!(
+            "/open-apis/im/v1/chats/{}/members?member_id_type=open_id",
+            req.chat_id
+        );
         let resp = self.delete(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<serde_json::Value> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {

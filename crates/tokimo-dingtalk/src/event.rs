@@ -1,10 +1,10 @@
+use crate::client::DingTalkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    EventService, ImResult, ImError,
-    ImEvent, RegisterCallbackRequest, EventSubscription, EventSubscriptionStatus,
+    EventService, EventSubscription, EventSubscriptionStatus, ImError, ImEvent, ImResult,
+    RegisterCallbackRequest,
 };
-use crate::client::DingTalkClient;
 
 #[allow(dead_code)]
 #[derive(Deserialize)]
@@ -74,14 +74,22 @@ impl EventService for DingTalkClient {
             body.insert("aesKey".into(), serde_json::json!(aes_key));
         }
 
-        let resp = self.post(
-            "/v1.0/events/callbacks/register",
-            &serde_json::Value::Object(body),
-        ).await?;
+        let resp = self
+            .post(
+                "/v1.0/events/callbacks/register",
+                &serde_json::Value::Object(body),
+            )
+            .await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let sub: DtSubscription = serde_json::from_str(&text)?;
         Ok(sub.into())
@@ -90,31 +98,49 @@ impl EventService for DingTalkClient {
     async fn list_subscriptions(&self) -> ImResult<Vec<EventSubscription>> {
         let resp = self.get("/v1.0/events/callbacks").await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let data: DtSubscriptionListResponse = serde_json::from_str(&text)?;
         Ok(data.subscriptions.into_iter().map(Into::into).collect())
     }
 
     async fn delete_subscription(&self, subscription_id: &str) -> ImResult<()> {
-        let token = self.access_token.read().await.clone().ok_or_else(|| ImError::Auth {
-            message: "no access token".into(),
-        })?;
+        let token = self
+            .access_token
+            .read()
+            .await
+            .clone()
+            .ok_or_else(|| ImError::Auth {
+                message: "no access token".into(),
+            })?;
         let url = format!(
             "{}/v1.0/events/callbacks/{}",
             self.base_url, subscription_id
         );
-        let resp = self.http
+        let resp = self
+            .http
             .delete(&url)
             .header("x-acs-dingtalk-access-token", &token)
             .send()
             .await
             .map_err(|e| ImError::Network(e.to_string()))?;
         if !resp.status().is_success() {
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
-            return Err(ImError::Platform { code: 0, message: text });
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
+            return Err(ImError::Platform {
+                code: 0,
+                message: text,
+            });
         }
         Ok(())
     }

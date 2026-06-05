@@ -1,11 +1,10 @@
+use crate::client::WeComClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    DepartmentService, ImResult, ImError,
-    DepartmentDetail, User, Department, Page,
-    ListDepartmentsRequest, ListDepartmentMembersRequest,
+    Department, DepartmentDetail, DepartmentService, ImError, ImResult,
+    ListDepartmentMembersRequest, ListDepartmentsRequest, Page, User,
 };
-use crate::client::WeComClient;
 
 #[derive(Deserialize)]
 struct DeptListResp {
@@ -74,11 +73,15 @@ impl From<WcUser> for User {
             email: u.email,
             phone: u.mobile,
             avatar: u.avatar,
-            departments: u.department.into_iter().map(|d| Department {
-                id: d.to_string(),
-                name: String::new(),
-                parent_id: None,
-            }).collect(),
+            departments: u
+                .department
+                .into_iter()
+                .map(|d| Department {
+                    id: d.to_string(),
+                    name: String::new(),
+                    parent_id: None,
+                })
+                .collect(),
             extra: serde_json::Value::Null,
         }
     }
@@ -96,11 +99,17 @@ fn check_errcode(errcode: Option<i64>, errmsg: Option<String>, raw: String) -> I
 
 #[async_trait]
 impl DepartmentService for WeComClient {
-    async fn list_departments(&self, req: ListDepartmentsRequest) -> ImResult<Page<DepartmentDetail>> {
+    async fn list_departments(
+        &self,
+        req: ListDepartmentsRequest,
+    ) -> ImResult<Page<DepartmentDetail>> {
         let parent_id = req.parent_id.as_deref().unwrap_or("0");
         let path = format!("/cgi-bin/department/list?id={}", parent_id);
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: DeptListResp = serde_json::from_str(&text)?;
         check_errcode(data.errcode, data.errmsg, text)?;
 
@@ -115,7 +124,10 @@ impl DepartmentService for WeComClient {
     async fn get_department(&self, department_id: &str) -> ImResult<DepartmentDetail> {
         let path = format!("/cgi-bin/department/get?id={}", department_id);
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: DeptGetResp = serde_json::from_str(&text)?;
         check_errcode(data.errcode, data.errmsg.clone(), text)?;
 
@@ -126,13 +138,19 @@ impl DepartmentService for WeComClient {
             })
     }
 
-    async fn list_department_members(&self, req: ListDepartmentMembersRequest) -> ImResult<Page<User>> {
+    async fn list_department_members(
+        &self,
+        req: ListDepartmentMembersRequest,
+    ) -> ImResult<Page<User>> {
         let path = format!(
             "/cgi-bin/user/list?department_id={}&fetch_child=0",
             req.department_id
         );
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: MemberListResp = serde_json::from_str(&text)?;
         check_errcode(data.errcode, data.errmsg, text)?;
 

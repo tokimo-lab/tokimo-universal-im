@@ -1,10 +1,7 @@
+use crate::client::DingTalkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
-use tokimo_core::{
-    ContactService, ImResult, ImError,
-    User, Page, SearchUserRequest, Department,
-};
-use crate::client::DingTalkClient;
+use tokimo_core::{ContactService, Department, ImError, ImResult, Page, SearchUserRequest, User};
 
 #[derive(Deserialize)]
 struct DtUser {
@@ -35,11 +32,15 @@ impl From<DtUser> for User {
             email: u.email.or(u.org_auth_email),
             phone: u.mobile,
             avatar: None,
-            departments: u.depts.into_iter().map(|d| Department {
-                id: d.dept_id.unwrap_or_default(),
-                name: d.dept_name.unwrap_or_default(),
-                parent_id: None,
-            }).collect(),
+            departments: u
+                .depts
+                .into_iter()
+                .map(|d| Department {
+                    id: d.dept_id.unwrap_or_default(),
+                    name: d.dept_name.unwrap_or_default(),
+                    parent_id: None,
+                })
+                .collect(),
             extra: serde_json::Value::Null,
         }
     }
@@ -50,9 +51,15 @@ impl ContactService for DingTalkClient {
     async fn get_self(&self) -> ImResult<User> {
         let resp = self.get("/v1.0/contact/users/me").await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let u: DtUser = serde_json::from_str(&text)?;
         Ok(u.into())
@@ -62,13 +69,21 @@ impl ContactService for DingTalkClient {
         let body = serde_json::json!({ "keyword": req.keyword });
         let resp = self.post("/v1.0/contact/users/search", &body).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let val: serde_json::Value = serde_json::from_str(&text)?;
         let users: Vec<DtUser> = serde_json::from_value(
-            val.get("list").cloned().unwrap_or(serde_json::Value::Array(vec![]))
+            val.get("list")
+                .cloned()
+                .unwrap_or(serde_json::Value::Array(vec![])),
         )?;
         Ok(Page {
             items: users.into_iter().map(Into::into).collect(),
@@ -81,13 +96,21 @@ impl ContactService for DingTalkClient {
         let body = serde_json::json!({ "userIds": user_ids });
         let resp = self.post("/v1.0/contact/users/get", &body).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let val: serde_json::Value = serde_json::from_str(&text)?;
         let users: Vec<DtUser> = serde_json::from_value(
-            val.get("list").cloned().unwrap_or(serde_json::Value::Array(vec![]))
+            val.get("list")
+                .cloned()
+                .unwrap_or(serde_json::Value::Array(vec![])),
         )?;
         Ok(users.into_iter().map(Into::into).collect())
     }

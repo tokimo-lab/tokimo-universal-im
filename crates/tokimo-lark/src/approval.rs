@@ -1,11 +1,10 @@
+use crate::client::LarkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    ApprovalService, ImResult, ImError,
-    ApprovalInstance, ApprovalStatus, ApprovalAction, Page,
-    CreateApprovalRequest, ListApprovalRequest, ApprovalActionRequest,
+    ApprovalAction, ApprovalActionRequest, ApprovalInstance, ApprovalService, ApprovalStatus,
+    CreateApprovalRequest, ImError, ImResult, ListApprovalRequest, Page,
 };
-use crate::client::LarkClient;
 
 #[derive(Deserialize)]
 struct LarkResp<T> {
@@ -68,7 +67,10 @@ impl ApprovalService for LarkClient {
             "cc_list": req.cc_users.iter().map(|id| serde_json::json!({"open_id": id})).collect::<Vec<_>>(),
         });
         let resp = self.post("/open-apis/approval/v4/instances", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<CreateData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -100,7 +102,10 @@ impl ApprovalService for LarkClient {
             path.push_str(&format!("&page_token={}", cursor));
         }
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<ListData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -109,11 +114,15 @@ impl ApprovalService for LarkClient {
             });
         }
         let list = data.data.unwrap_or(ListData {
-            instance_code_list: vec![], page_token: None, has_more: None,
+            instance_code_list: vec![],
+            page_token: None,
+            has_more: None,
         });
         // The list endpoint only returns instance codes; create stubs.
-        let items: Vec<ApprovalInstance> = list.instance_code_list.into_iter().map(|code| {
-            ApprovalInstance {
+        let items: Vec<ApprovalInstance> = list
+            .instance_code_list
+            .into_iter()
+            .map(|code| ApprovalInstance {
                 id: code,
                 process_code: approval_code.to_string(),
                 title: String::new(),
@@ -122,8 +131,8 @@ impl ApprovalService for LarkClient {
                 form_data: serde_json::Value::Null,
                 created_at: None,
                 finished_at: None,
-            }
-        }).collect();
+            })
+            .collect();
         Ok(Page {
             items,
             has_more: list.has_more.unwrap_or(false),
@@ -134,7 +143,10 @@ impl ApprovalService for LarkClient {
     async fn get_approval(&self, instance_id: &str) -> ImResult<ApprovalInstance> {
         let path = format!("/open-apis/approval/v4/instances/{}", instance_id);
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<InstanceData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -145,14 +157,22 @@ impl ApprovalService for LarkClient {
         let inst = data.data.ok_or_else(|| ImError::NotFound {
             resource: instance_id.into(),
         })?;
-        let form_data = inst.form.as_deref()
+        let form_data = inst
+            .form
+            .as_deref()
             .and_then(|s| serde_json::from_str(s).ok())
             .unwrap_or(serde_json::Value::Null);
         Ok(ApprovalInstance {
-            id: inst.instance_code.unwrap_or_else(|| instance_id.to_string()),
+            id: inst
+                .instance_code
+                .unwrap_or_else(|| instance_id.to_string()),
             process_code: inst.approval_code.unwrap_or_default(),
             title: inst.approval_name.unwrap_or_default(),
-            status: inst.status.as_deref().map(parse_status).unwrap_or(ApprovalStatus::Pending),
+            status: inst
+                .status
+                .as_deref()
+                .map(parse_status)
+                .unwrap_or(ApprovalStatus::Pending),
             initiator_id: inst.open_id.or(inst.user_id).unwrap_or_default(),
             form_data,
             created_at: inst.start_time.as_deref().and_then(ts_opt),
@@ -171,9 +191,15 @@ impl ApprovalService for LarkClient {
             "user_id": "",
             "comment": req.comment.unwrap_or_default(),
         });
-        let path = format!("/open-apis/approval/v4/instances/{}/{}", req.instance_id, action_path);
+        let path = format!(
+            "/open-apis/approval/v4/instances/{}/{}",
+            req.instance_id, action_path
+        );
         let resp = self.post(&path, &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<serde_json::Value> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {

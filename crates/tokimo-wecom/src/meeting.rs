@@ -1,11 +1,10 @@
+use crate::client::WeComClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    MeetingService, ImResult, ImError,
-    Meeting, MeetingStatus, MeetingType, MeetingAttendee, MeetingSettings, Page,
-    CreateMeetingRequest, ListMeetingsRequest, UpdateMeetingMembersRequest,
+    CreateMeetingRequest, ImError, ImResult, ListMeetingsRequest, Meeting, MeetingAttendee,
+    MeetingService, MeetingSettings, MeetingStatus, MeetingType, Page, UpdateMeetingMembersRequest,
 };
-use crate::client::WeComClient;
 
 #[derive(Deserialize)]
 struct CreateResp {
@@ -79,7 +78,11 @@ impl From<MeetingInfo> for Meeting {
             id: m.meetingid.unwrap_or_default(),
             title: m.title.unwrap_or_default(),
             description: m.description,
-            start_time: m.meeting_start_datetime.as_deref().map(parse_wc_meeting_dt).unwrap_or_else(chrono::Utc::now),
+            start_time: m
+                .meeting_start_datetime
+                .as_deref()
+                .map(parse_wc_meeting_dt)
+                .unwrap_or_else(chrono::Utc::now),
             duration_secs: m.meeting_duration.unwrap_or(0),
             location: None,
             meeting_code: m.meeting_code,
@@ -99,12 +102,20 @@ impl From<MeetingInfo> for Meeting {
                 _ => MeetingType::Other,
             },
             creator_id: m.creator_userid.or(m.admin_userid),
-            attendees: m.attendees.map(|a| a.member.into_iter().map(|mm| MeetingAttendee {
-                user_id: mm.userid.unwrap_or_default(),
-                name: None,
-                joined: mm.status.unwrap_or(0) == 1,
-                cumulative_time_secs: mm.cumulative_time,
-            }).collect()).unwrap_or_default(),
+            attendees: m
+                .attendees
+                .map(|a| {
+                    a.member
+                        .into_iter()
+                        .map(|mm| MeetingAttendee {
+                            user_id: mm.userid.unwrap_or_default(),
+                            name: None,
+                            joined: mm.status.unwrap_or(0) == 1,
+                            cumulative_time_secs: mm.cumulative_time,
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
             settings: m.settings.map(|s| MeetingSettings {
                 password: s.password,
                 enable_waiting_room: s.enable_waiting_room,
@@ -137,10 +148,16 @@ impl MeetingService for WeComClient {
             })),
         });
         let resp = self.post("/cgi-bin/meeting/create", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: CreateResp = serde_json::from_str(&text)?;
         if data.errcode.unwrap_or(0) != 0 {
-            return Err(ImError::Platform { code: data.errcode.unwrap_or(-1), message: data.errmsg.unwrap_or(text) });
+            return Err(ImError::Platform {
+                code: data.errcode.unwrap_or(-1),
+                message: data.errmsg.unwrap_or(text),
+            });
         }
         Ok(Meeting {
             id: data.meetingid.unwrap_or_default(),
@@ -167,11 +184,19 @@ impl MeetingService for WeComClient {
             "cursor": req.cursor,
             "limit": req.limit.unwrap_or(20),
         });
-        let resp = self.post("/cgi-bin/meeting/list_user_meetings", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let resp = self
+            .post("/cgi-bin/meeting/list_user_meetings", &body)
+            .await?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: ListResp = serde_json::from_str(&text)?;
         if data.errcode.unwrap_or(0) != 0 {
-            return Err(ImError::Platform { code: data.errcode.unwrap_or(-1), message: data.errmsg.unwrap_or(text) });
+            return Err(ImError::Platform {
+                code: data.errcode.unwrap_or(-1),
+                message: data.errmsg.unwrap_or(text),
+            });
         }
         // Fetch details for each meeting
         let mut meetings = vec![];
@@ -190,7 +215,10 @@ impl MeetingService for WeComClient {
     async fn get_meeting(&self, meeting_id: &str) -> ImResult<Meeting> {
         let body = serde_json::json!({ "meetingid": meeting_id });
         let resp = self.post("/cgi-bin/meeting/get_info", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let info: MeetingInfo = serde_json::from_str(&text)?;
         Ok(info.into())
     }
@@ -200,8 +228,14 @@ impl MeetingService for WeComClient {
         let resp = self.post("/cgi-bin/meeting/cancel", &body).await?;
         let status = resp.status();
         if !status.is_success() {
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         Ok(())
     }
@@ -211,11 +245,19 @@ impl MeetingService for WeComClient {
             "meetingid": req.meeting_id,
             "invitees": req.invitee_ids.iter().map(|id| serde_json::json!({"userid": id})).collect::<Vec<_>>(),
         });
-        let resp = self.post("/cgi-bin/meeting/set_invite_members", &body).await?;
+        let resp = self
+            .post("/cgi-bin/meeting/set_invite_members", &body)
+            .await?;
         let status = resp.status();
         if !status.is_success() {
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         Ok(())
     }

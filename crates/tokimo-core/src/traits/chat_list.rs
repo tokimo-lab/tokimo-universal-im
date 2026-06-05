@@ -1,6 +1,6 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
-use crate::types::{Conversation, Page, ListConversationsRequest};
+use crate::types::{Conversation, ListConversationsRequest, Page};
+use async_trait::async_trait;
 
 /// Chat list / conversation list operations.
 ///
@@ -9,5 +9,8 @@ use crate::types::{Conversation, Page, ListConversationsRequest};
 #[async_trait]
 pub trait ChatListService: Send + Sync {
     /// List recent conversations.
-    async fn list_conversations(&self, req: ListConversationsRequest) -> ImResult<Page<Conversation>>;
+    async fn list_conversations(
+        &self,
+        req: ListConversationsRequest,
+    ) -> ImResult<Page<Conversation>>;
 }

@@ -1,9 +1,8 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
 use crate::types::{
-    ApprovalInstance, Page, CreateApprovalRequest,
-    ListApprovalRequest, ApprovalActionRequest,
+    ApprovalActionRequest, ApprovalInstance, CreateApprovalRequest, ListApprovalRequest, Page,
 };
+use async_trait::async_trait;
 
 /// Approval / OA workflow management.
 #[async_trait]

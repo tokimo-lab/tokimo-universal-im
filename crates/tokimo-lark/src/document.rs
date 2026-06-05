@@ -1,11 +1,10 @@
+use crate::client::LarkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    DocumentService, ImResult, ImError,
-    Document, DocumentType, Page,
-    CreateDocumentRequest, UpdateDocumentRequest, SearchDocumentRequest,
+    CreateDocumentRequest, Document, DocumentService, DocumentType, ImError, ImResult, Page,
+    SearchDocumentRequest, UpdateDocumentRequest,
 };
-use crate::client::LarkClient;
 
 #[derive(Deserialize)]
 struct LarkResp<T> {
@@ -62,7 +61,10 @@ impl DocumentService for LarkClient {
             "folder_token": "",
         });
         let resp = self.post("/open-apis/docx/v1/documents", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<CreateDocData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -70,14 +72,19 @@ impl DocumentService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let doc = data.data.and_then(|d| d.document).unwrap_or(DocInfo { document_id: None, title: None });
+        let doc = data.data.and_then(|d| d.document).unwrap_or(DocInfo {
+            document_id: None,
+            title: None,
+        });
         let doc_id = doc.document_id.unwrap_or_default();
         // Write initial content if provided
         if let Some(ref content) = req.content {
-            let _ = self.update_document(UpdateDocumentRequest {
-                doc_id: doc_id.clone(),
-                content: content.clone(),
-            }).await;
+            let _ = self
+                .update_document(UpdateDocumentRequest {
+                    doc_id: doc_id.clone(),
+                    content: content.clone(),
+                })
+                .await;
         }
         Ok(Document {
             id: doc_id,
@@ -92,7 +99,10 @@ impl DocumentService for LarkClient {
     async fn get_document(&self, doc_id: &str) -> ImResult<Document> {
         let path = format!("/open-apis/docx/v1/documents/{}", doc_id);
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<GetDocData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -100,15 +110,23 @@ impl DocumentService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let doc = data.data.and_then(|d| d.document).ok_or_else(|| ImError::NotFound {
-            resource: doc_id.into(),
-        })?;
+        let doc = data
+            .data
+            .and_then(|d| d.document)
+            .ok_or_else(|| ImError::NotFound {
+                resource: doc_id.into(),
+            })?;
         // Fetch raw content blocks
         let content_path = format!("/open-apis/docx/v1/documents/{}/raw_content", doc_id);
         let content_resp = self.get(&content_path).await?;
-        let content_text = content_resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let content_text = content_resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let content_data: LarkResp<serde_json::Value> = serde_json::from_str(&content_text)?;
-        let content = content_data.data.and_then(|d| d.get("content").and_then(|v| v.as_str()).map(String::from));
+        let content = content_data
+            .data
+            .and_then(|d| d.get("content").and_then(|v| v.as_str()).map(String::from));
 
         Ok(Document {
             id: doc_id.to_string(),
@@ -133,9 +151,15 @@ impl DocumentService for LarkClient {
                 }
             }]
         });
-        let path = format!("/open-apis/docx/v1/documents/{}/blocks/batch_update", req.doc_id);
+        let path = format!(
+            "/open-apis/docx/v1/documents/{}/blocks/batch_update",
+            req.doc_id
+        );
         let resp = self.post(&path, &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<serde_json::Value> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -152,8 +176,13 @@ impl DocumentService for LarkClient {
             "count": req.limit.unwrap_or(20),
             "offset": req.cursor.as_deref().and_then(|s| s.parse::<u32>().ok()).unwrap_or(0),
         });
-        let resp = self.post("/open-apis/suite/docs-api/search/object", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let resp = self
+            .post("/open-apis/suite/docs-api/search/object", &body)
+            .await?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<SearchData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -161,21 +190,29 @@ impl DocumentService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let search = data.data.unwrap_or(SearchData { items: vec![], page_token: None, has_more: None });
+        let search = data.data.unwrap_or(SearchData {
+            items: vec![],
+            page_token: None,
+            has_more: None,
+        });
         Ok(Page {
-            items: search.items.into_iter().map(|item| Document {
-                id: item.doc_token.unwrap_or_default(),
-                title: item.title.unwrap_or_default(),
-                doc_type: match item.doc_type.as_deref() {
-                    Some("doc") => DocumentType::Document,
-                    Some("sheet") => DocumentType::Spreadsheet,
-                    Some("wiki") => DocumentType::Wiki,
-                    _ => DocumentType::Other,
-                },
-                url: item.url,
-                content: None,
-                extra: serde_json::Value::Null,
-            }).collect(),
+            items: search
+                .items
+                .into_iter()
+                .map(|item| Document {
+                    id: item.doc_token.unwrap_or_default(),
+                    title: item.title.unwrap_or_default(),
+                    doc_type: match item.doc_type.as_deref() {
+                        Some("doc") => DocumentType::Document,
+                        Some("sheet") => DocumentType::Spreadsheet,
+                        Some("wiki") => DocumentType::Wiki,
+                        _ => DocumentType::Other,
+                    },
+                    url: item.url,
+                    content: None,
+                    extra: serde_json::Value::Null,
+                })
+                .collect(),
             has_more: search.has_more.unwrap_or(false),
             next_cursor: search.page_token,
         })

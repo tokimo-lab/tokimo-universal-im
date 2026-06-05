@@ -1,10 +1,9 @@
-use tokimo_core::{
-    Platform, ImProvider,
-    AuthService, MessagingService, ContactService, GroupService, CalendarService, TaskService,
-    MeetingService, ChatListService, MediaService, MessageExtService, DocumentService,
-    WebhookService, EventService, DepartmentService, DataTableService,
-};
 use crate::client::WeComClient;
+use tokimo_core::{
+    AuthService, CalendarService, ChatListService, ContactService, DataTableService,
+    DepartmentService, DocumentService, EventService, GroupService, ImProvider, MediaService,
+    MeetingService, MessageExtService, MessagingService, Platform, TaskService, WebhookService,
+};
 
 /// WeCom (企业微信) platform provider.
 pub struct WeComProvider {

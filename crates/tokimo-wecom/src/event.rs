@@ -1,10 +1,10 @@
+use crate::client::WeComClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    EventService, ImResult, ImError,
-    ImEvent, RegisterCallbackRequest, EventSubscription, EventSubscriptionStatus,
+    EventService, EventSubscription, EventSubscriptionStatus, ImError, ImEvent, ImResult,
+    RegisterCallbackRequest,
 };
-use crate::client::WeComClient;
 
 #[derive(Deserialize)]
 struct CallbackResp {
@@ -77,14 +77,20 @@ impl EventService for WeComClient {
         });
 
         let resp = self.post("/cgi-bin/callback/create", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: CallbackResp = serde_json::from_str(&text)?;
 
         let errcode = data.errcode.unwrap_or(0);
         if errcode == 301002 {
             // Callback already exists, update it
             let resp = self.post("/cgi-bin/callback/update", &body).await?;
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
             let data: CallbackResp = serde_json::from_str(&text)?;
             check_errcode(data.errcode, data.errmsg, text)?;
         } else {
@@ -101,7 +107,10 @@ impl EventService for WeComClient {
 
     async fn list_subscriptions(&self) -> ImResult<Vec<EventSubscription>> {
         let resp = self.get("/cgi-bin/callback/get").await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: GetCallbackResp = serde_json::from_str(&text)?;
 
         let errcode = data.errcode.unwrap_or(0);
@@ -121,7 +130,10 @@ impl EventService for WeComClient {
 
     async fn delete_subscription(&self, _subscription_id: &str) -> ImResult<()> {
         let resp = self.get("/cgi-bin/callback/delete").await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: CallbackResp = serde_json::from_str(&text)?;
         check_errcode(data.errcode, data.errmsg, text)?;
         Ok(())

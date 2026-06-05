@@ -28,7 +28,11 @@ pub(crate) enum TokenType {
 }
 
 impl LarkClient {
-    pub fn new(app_id: impl Into<String>, app_secret: impl Into<String>, region: LarkRegion) -> Self {
+    pub fn new(
+        app_id: impl Into<String>,
+        app_secret: impl Into<String>,
+        region: LarkRegion,
+    ) -> Self {
         let base = match region {
             LarkRegion::Feishu => "https://open.feishu.cn",
             LarkRegion::Lark => "https://open.larksuite.com",
@@ -50,7 +54,11 @@ impl LarkClient {
 
     pub async fn set_token(&self, token: String, is_user: bool) {
         *self.access_token.write().await = Some(token);
-        *self.token_type.write().await = if is_user { TokenType::User } else { TokenType::Tenant };
+        *self.token_type.write().await = if is_user {
+            TokenType::User
+        } else {
+            TokenType::Tenant
+        };
     }
 
     pub(crate) async fn get(&self, path: &str) -> Result<reqwest::Response, tokimo_core::ImError> {
@@ -94,7 +102,10 @@ impl LarkClient {
             .map_err(|e| tokimo_core::ImError::Network(e.to_string()))
     }
 
-    pub(crate) async fn delete(&self, path: &str) -> Result<reqwest::Response, tokimo_core::ImError> {
+    pub(crate) async fn delete(
+        &self,
+        path: &str,
+    ) -> Result<reqwest::Response, tokimo_core::ImError> {
         let token = self.token_or_err().await?;
         let url = format!("{}{}", self.base_url, path);
         self.http

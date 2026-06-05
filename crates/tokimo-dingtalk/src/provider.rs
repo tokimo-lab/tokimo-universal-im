@@ -1,11 +1,10 @@
-use tokimo_core::{
-    Platform, ImProvider,
-    AuthService, MessagingService, ContactService, GroupService, CalendarService, TaskService,
-    MeetingService, ChatListService, MediaService, MessageExtService, DocumentService,
-    WebhookService, EventService, DepartmentService, MeetingRoomService,
-    ApprovalService, AttendanceService, ReportService, DataTableService,
-};
 use crate::client::DingTalkClient;
+use tokimo_core::{
+    ApprovalService, AttendanceService, AuthService, CalendarService, ChatListService,
+    ContactService, DataTableService, DepartmentService, DocumentService, EventService,
+    GroupService, ImProvider, MediaService, MeetingRoomService, MeetingService, MessageExtService,
+    MessagingService, Platform, ReportService, TaskService, WebhookService,
+};
 
 /// DingTalk platform provider.
 ///

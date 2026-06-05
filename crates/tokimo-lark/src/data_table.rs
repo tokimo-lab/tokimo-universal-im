@@ -1,12 +1,11 @@
+use crate::client::LarkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    DataTableService, ImResult, ImError,
-    DataBase, DataTable, DataField, DataRecord, Page,
-    CreateBaseRequest, ListBasesRequest, CreateTableRequest,
-    CreateFieldRequest, ListRecordsRequest, WriteRecordsRequest,
+    CreateBaseRequest, CreateFieldRequest, CreateTableRequest, DataBase, DataField, DataRecord,
+    DataTable, DataTableService, ImError, ImResult, ListBasesRequest, ListRecordsRequest, Page,
+    WriteRecordsRequest,
 };
-use crate::client::LarkClient;
 
 #[derive(Deserialize)]
 struct LarkResp<T> {
@@ -167,8 +166,9 @@ struct LarkRecord {
 
 impl From<LarkRecord> for DataRecord {
     fn from(r: LarkRecord) -> Self {
-        let created_at = r.created_time
-            .and_then(|ms| chrono::DateTime::from_timestamp_millis(ms));
+        let created_at = r
+            .created_time
+            .and_then(chrono::DateTime::from_timestamp_millis);
         DataRecord {
             id: r.record_id.unwrap_or_default(),
             fields: r.fields.unwrap_or(serde_json::Value::Null),
@@ -187,7 +187,10 @@ impl DataTableService for LarkClient {
             "folder_token": req.folder_id.unwrap_or_default(),
         });
         let resp = self.post("/open-apis/bitable/v1/apps", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<CreateBaseData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -195,7 +198,10 @@ impl DataTableService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let base = data.data.and_then(|d| d.app).ok_or_else(|| ImError::Internal("empty response".into()))?;
+        let base = data
+            .data
+            .and_then(|d| d.app)
+            .ok_or_else(|| ImError::Internal("empty response".into()))?;
         Ok(base.into())
     }
 
@@ -208,7 +214,10 @@ impl DataTableService for LarkClient {
             path.push_str(&format!("&page_token={}", cursor));
         }
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<ListBasesData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -216,7 +225,11 @@ impl DataTableService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let list = data.data.unwrap_or(ListBasesData { items: vec![], page_token: None, has_more: None });
+        let list = data.data.unwrap_or(ListBasesData {
+            items: vec![],
+            page_token: None,
+            has_more: None,
+        });
         Ok(Page {
             items: list.items.into_iter().map(Into::into).collect(),
             has_more: list.has_more.unwrap_or(false),
@@ -227,7 +240,10 @@ impl DataTableService for LarkClient {
     async fn get_base(&self, base_id: &str) -> ImResult<DataBase> {
         let path = format!("/open-apis/bitable/v1/apps/{}", base_id);
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<GetBaseData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -235,9 +251,12 @@ impl DataTableService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let base = data.data.and_then(|d| d.app).ok_or_else(|| ImError::NotFound {
-            resource: base_id.into(),
-        })?;
+        let base = data
+            .data
+            .and_then(|d| d.app)
+            .ok_or_else(|| ImError::NotFound {
+                resource: base_id.into(),
+            })?;
         Ok(base.into())
     }
 
@@ -251,20 +270,24 @@ impl DataTableService for LarkClient {
     // ── Table operations ──
 
     async fn create_table(&self, req: CreateTableRequest) -> ImResult<DataTable> {
-        let fields: Vec<serde_json::Value> = req.fields.iter().map(|f| {
-            serde_json::json!({
-                "field_name": f.name,
-                "type": match f.field_type.as_str() {
-                    "text" => 1,
-                    "number" => 2,
-                    "select" => 3,
-                    "multi_select" => 4,
-                    "date" => 5,
-                    "checkbox" => 7,
-                    _ => 1,
-                },
+        let fields: Vec<serde_json::Value> = req
+            .fields
+            .iter()
+            .map(|f| {
+                serde_json::json!({
+                    "field_name": f.name,
+                    "type": match f.field_type.as_str() {
+                        "text" => 1,
+                        "number" => 2,
+                        "select" => 3,
+                        "multi_select" => 4,
+                        "date" => 5,
+                        "checkbox" => 7,
+                        _ => 1,
+                    },
+                })
             })
-        }).collect();
+            .collect();
         let body = serde_json::json!({
             "table": {
                 "name": req.name,
@@ -274,7 +297,10 @@ impl DataTableService for LarkClient {
         });
         let path = format!("/open-apis/bitable/v1/apps/{}/tables", req.base_id);
         let resp = self.post(&path, &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<CreateTableData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -293,7 +319,10 @@ impl DataTableService for LarkClient {
     async fn list_tables(&self, base_id: &str) -> ImResult<Vec<DataTable>> {
         let path = format!("/open-apis/bitable/v1/apps/{}/tables", base_id);
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<ListTablesData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -308,7 +337,10 @@ impl DataTableService for LarkClient {
     async fn delete_table(&self, base_id: &str, table_id: &str) -> ImResult<()> {
         let path = format!("/open-apis/bitable/v1/apps/{}/tables/{}", base_id, table_id);
         let resp = self.delete(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<serde_json::Value> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -322,9 +354,15 @@ impl DataTableService for LarkClient {
     // ── Field operations ──
 
     async fn list_fields(&self, base_id: &str, table_id: &str) -> ImResult<Vec<DataField>> {
-        let path = format!("/open-apis/bitable/v1/apps/{}/tables/{}/fields", base_id, table_id);
+        let path = format!(
+            "/open-apis/bitable/v1/apps/{}/tables/{}/fields",
+            base_id, table_id
+        );
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<ListFieldsData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -336,7 +374,12 @@ impl DataTableService for LarkClient {
         Ok(list.items.into_iter().map(Into::into).collect())
     }
 
-    async fn create_field(&self, base_id: &str, table_id: &str, req: CreateFieldRequest) -> ImResult<DataField> {
+    async fn create_field(
+        &self,
+        base_id: &str,
+        table_id: &str,
+        req: CreateFieldRequest,
+    ) -> ImResult<DataField> {
         let type_num = match req.field_type.as_str() {
             "text" => 1,
             "number" => 2,
@@ -355,9 +398,15 @@ impl DataTableService for LarkClient {
             "type": type_num,
             "property": req.property,
         });
-        let path = format!("/open-apis/bitable/v1/apps/{}/tables/{}/fields", base_id, table_id);
+        let path = format!(
+            "/open-apis/bitable/v1/apps/{}/tables/{}/fields",
+            base_id, table_id
+        );
         let resp = self.post(&path, &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<FieldData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -365,7 +414,10 @@ impl DataTableService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let field = data.data.and_then(|d| d.field).ok_or_else(|| ImError::Internal("empty field".into()))?;
+        let field = data
+            .data
+            .and_then(|d| d.field)
+            .ok_or_else(|| ImError::Internal("empty field".into()))?;
         Ok(field.into())
     }
 
@@ -374,7 +426,8 @@ impl DataTableService for LarkClient {
     async fn list_records(&self, req: ListRecordsRequest) -> ImResult<Page<DataRecord>> {
         let mut path = format!(
             "/open-apis/bitable/v1/apps/{}/tables/{}/records?page_size={}",
-            req.base_id, req.table_id,
+            req.base_id,
+            req.table_id,
             req.limit.unwrap_or(100),
         );
         if let Some(ref cursor) = req.cursor {
@@ -384,10 +437,16 @@ impl DataTableService for LarkClient {
             path.push_str(&format!("&view_id={}", view_id));
         }
         if let Some(ref filter) = req.filter {
-            path.push_str(&format!("&filter={}", url::form_urlencoded::byte_serialize(filter.as_bytes()).collect::<String>()));
+            path.push_str(&format!(
+                "&filter={}",
+                url::form_urlencoded::byte_serialize(filter.as_bytes()).collect::<String>()
+            ));
         }
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<ListRecordsData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -396,7 +455,10 @@ impl DataTableService for LarkClient {
             });
         }
         let list = data.data.unwrap_or(ListRecordsData {
-            items: vec![], page_token: None, has_more: None, total: None,
+            items: vec![],
+            page_token: None,
+            has_more: None,
+            total: None,
         });
         Ok(Page {
             items: list.items.into_iter().map(Into::into).collect(),
@@ -429,7 +491,10 @@ impl DataTableService for LarkClient {
                 req.base_id, req.table_id,
             );
             let resp = self.post(&path, &body).await?;
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
             let data: LarkResp<BatchRecordData> = serde_json::from_str(&text)?;
             if data.code.unwrap_or(0) != 0 {
                 return Err(ImError::Platform {
@@ -449,7 +514,10 @@ impl DataTableService for LarkClient {
                 req.base_id, req.table_id,
             );
             let resp = self.post(&path, &body).await?;
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
             let data: LarkResp<BatchRecordData> = serde_json::from_str(&text)?;
             if data.code.unwrap_or(0) != 0 {
                 return Err(ImError::Platform {
@@ -465,14 +533,22 @@ impl DataTableService for LarkClient {
         Ok(results)
     }
 
-    async fn delete_records(&self, base_id: &str, table_id: &str, record_ids: &[String]) -> ImResult<()> {
+    async fn delete_records(
+        &self,
+        base_id: &str,
+        table_id: &str,
+        record_ids: &[String],
+    ) -> ImResult<()> {
         let body = serde_json::json!({ "records": record_ids });
         let path = format!(
             "/open-apis/bitable/v1/apps/{}/tables/{}/records/batch_delete",
             base_id, table_id,
         );
         let resp = self.post(&path, &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<serde_json::Value> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {

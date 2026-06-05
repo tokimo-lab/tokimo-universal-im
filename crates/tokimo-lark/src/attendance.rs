@@ -1,11 +1,10 @@
+use crate::client::LarkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    AttendanceService, ImResult, ImError,
-    AttendanceRecord, AttendanceShift, AttendanceSummary, Page,
-    CheckType, AttendanceResult, ListAttendanceRequest,
+    AttendanceRecord, AttendanceResult, AttendanceService, AttendanceShift, AttendanceSummary,
+    CheckType, ImError, ImResult, ListAttendanceRequest, Page,
 };
-use crate::client::LarkClient;
 
 #[derive(Deserialize)]
 struct LarkResp<T> {
@@ -73,8 +72,13 @@ impl AttendanceService for LarkClient {
             "page_token": req.cursor.as_deref().unwrap_or(""),
             "page_size": req.limit.unwrap_or(50),
         });
-        let resp = self.post("/open-apis/attendance/v1/user_stats_datas/query", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let resp = self
+            .post("/open-apis/attendance/v1/user_stats_datas/query", &body)
+            .await?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<StatsData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -83,7 +87,9 @@ impl AttendanceService for LarkClient {
             });
         }
         let stats = data.data.unwrap_or(StatsData {
-            user_datas: vec![], page_token: None, has_more: None,
+            user_datas: vec![],
+            page_token: None,
+            has_more: None,
         });
         let mut records = Vec::new();
         for user_data in &stats.user_datas {
@@ -114,8 +120,13 @@ impl AttendanceService for LarkClient {
         _start_date: chrono::NaiveDate,
         _end_date: chrono::NaiveDate,
     ) -> ImResult<Vec<AttendanceShift>> {
-        let resp = self.get("/open-apis/attendance/v1/shifts?page_size=50").await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let resp = self
+            .get("/open-apis/attendance/v1/shifts?page_size=50")
+            .await?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<ShiftListData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -124,13 +135,19 @@ impl AttendanceService for LarkClient {
             });
         }
         let list = data.data.unwrap_or(ShiftListData {
-            shift_list: vec![], page_token: None, has_more: None,
+            shift_list: vec![],
+            page_token: None,
+            has_more: None,
         });
-        Ok(list.shift_list.into_iter().map(|s| AttendanceShift {
-            id: s.shift_id.unwrap_or_default(),
-            name: s.shift_name.unwrap_or_default(),
-            schedule: s.punch_time_rules,
-        }).collect())
+        Ok(list
+            .shift_list
+            .into_iter()
+            .map(|s| AttendanceShift {
+                id: s.shift_id.unwrap_or_default(),
+                name: s.shift_name.unwrap_or_default(),
+                schedule: s.punch_time_rules,
+            })
+            .collect())
     }
 
     async fn get_summary(
@@ -144,8 +161,13 @@ impl AttendanceService for LarkClient {
             "start_date": start_date.format("%Y-%m-%d").to_string(),
             "end_date": end_date.format("%Y-%m-%d").to_string(),
         });
-        let resp = self.post("/open-apis/attendance/v1/user_stats_views/query", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let resp = self
+            .post("/open-apis/attendance/v1/user_stats_views/query", &body)
+            .await?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<SummaryData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {

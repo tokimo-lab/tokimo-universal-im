@@ -1,11 +1,10 @@
+use crate::client::DingTalkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    DepartmentService, ImResult, ImError,
-    DepartmentDetail, User, Page,
-    ListDepartmentsRequest, ListDepartmentMembersRequest,
+    DepartmentDetail, DepartmentService, ImError, ImResult, ListDepartmentMembersRequest,
+    ListDepartmentsRequest, Page, User,
 };
-use crate::client::DingTalkClient;
 
 // ── DingTalk response types ──
 
@@ -83,7 +82,10 @@ impl From<DtDeptUser> for User {
 
 #[async_trait]
 impl DepartmentService for DingTalkClient {
-    async fn list_departments(&self, req: ListDepartmentsRequest) -> ImResult<Page<DepartmentDetail>> {
+    async fn list_departments(
+        &self,
+        req: ListDepartmentsRequest,
+    ) -> ImResult<Page<DepartmentDetail>> {
         let parent_id = req.parent_id.as_deref().unwrap_or("1");
         let path = format!(
             "/v1.0/contact/departments/{}/listSubDepartmentIds",
@@ -91,9 +93,15 @@ impl DepartmentService for DingTalkClient {
         );
         let resp = self.get(&path).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
 
         let sub_resp: DtSubDeptResponse = serde_json::from_str(&text)?;
@@ -128,15 +136,24 @@ impl DepartmentService for DingTalkClient {
         let path = format!("/v1.0/contact/departments/{}", department_id);
         let resp = self.get(&path).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let d: DtDepartment = serde_json::from_str(&text)?;
         Ok(d.into())
     }
 
-    async fn list_department_members(&self, req: ListDepartmentMembersRequest) -> ImResult<Page<User>> {
+    async fn list_department_members(
+        &self,
+        req: ListDepartmentMembersRequest,
+    ) -> ImResult<Page<User>> {
         let cursor = req.cursor.as_deref().unwrap_or("0");
         let size = req.limit.unwrap_or(100);
         let body = serde_json::json!({
@@ -144,11 +161,19 @@ impl DepartmentService for DingTalkClient {
             "cursor": cursor,
             "size": size
         });
-        let resp = self.post("/v1.0/contact/users/listByDepartmentIds", &body).await?;
+        let resp = self
+            .post("/v1.0/contact/users/listByDepartmentIds", &body)
+            .await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let data: DtUserListResponse = serde_json::from_str(&text)?;
         Ok(Page {

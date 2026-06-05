@@ -1,12 +1,11 @@
+use crate::client::WeComClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    DataTableService, ImResult, ImError,
-    DataBase, DataTable, DataField, DataRecord, Page,
-    CreateBaseRequest, ListBasesRequest, CreateTableRequest,
-    CreateFieldRequest, ListRecordsRequest, WriteRecordsRequest,
+    CreateBaseRequest, CreateFieldRequest, CreateTableRequest, DataBase, DataField, DataRecord,
+    DataTable, DataTableService, ImError, ImResult, ListBasesRequest, ListRecordsRequest, Page,
+    WriteRecordsRequest,
 };
-use crate::client::WeComClient;
 
 const PLATFORM: &str = "wecom";
 
@@ -82,9 +81,9 @@ fn wc_record_to_data_record(r: WcRecord) -> DataRecord {
     DataRecord {
         id: r.record_id.unwrap_or_default(),
         fields: r.values.unwrap_or(serde_json::Value::Null),
-        created_at: r.created_time.map(|ts| {
-            chrono::DateTime::from_timestamp(ts, 0).unwrap_or_else(chrono::Utc::now)
-        }),
+        created_at: r
+            .created_time
+            .map(|ts| chrono::DateTime::from_timestamp(ts, 0).unwrap_or_else(chrono::Utc::now)),
     }
 }
 
@@ -136,20 +135,34 @@ impl DataTableService for WeComClient {
             "docid": base_id,
             "sheet_id": table_id,
         });
-        let resp = self.post("/cgi-bin/wedoc/smartsheet/get_fields", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let resp = self
+            .post("/cgi-bin/wedoc/smartsheet/get_fields", &body)
+            .await?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: GetFieldsResp = serde_json::from_str(&text)?;
         check_errcode(data.errcode, data.errmsg, text)?;
 
-        Ok(data.fields.into_iter().map(|f| DataField {
-            id: f.field_id.unwrap_or_default(),
-            name: f.field_title.unwrap_or_default(),
-            field_type: f.field_type.unwrap_or_default(),
-            property: serde_json::Value::Null,
-        }).collect())
+        Ok(data
+            .fields
+            .into_iter()
+            .map(|f| DataField {
+                id: f.field_id.unwrap_or_default(),
+                name: f.field_title.unwrap_or_default(),
+                field_type: f.field_type.unwrap_or_default(),
+                property: serde_json::Value::Null,
+            })
+            .collect())
     }
 
-    async fn create_field(&self, _base_id: &str, _table_id: &str, _req: CreateFieldRequest) -> ImResult<DataField> {
+    async fn create_field(
+        &self,
+        _base_id: &str,
+        _table_id: &str,
+        _req: CreateFieldRequest,
+    ) -> ImResult<DataField> {
         Err(not_supported("create_field"))
     }
 
@@ -167,12 +180,21 @@ impl DataTableService for WeComClient {
             body["limit"] = serde_json::json!(limit.min(500));
         }
 
-        let resp = self.post("/cgi-bin/wedoc/smartsheet/get_records", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let resp = self
+            .post("/cgi-bin/wedoc/smartsheet/get_records", &body)
+            .await?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: GetRecordsResp = serde_json::from_str(&text)?;
         check_errcode(data.errcode, data.errmsg, text)?;
 
-        let items: Vec<DataRecord> = data.records.into_iter().map(wc_record_to_data_record).collect();
+        let items: Vec<DataRecord> = data
+            .records
+            .into_iter()
+            .map(wc_record_to_data_record)
+            .collect();
         Ok(Page {
             items,
             has_more: data.has_more.unwrap_or(false),
@@ -196,16 +218,22 @@ impl DataTableService for WeComClient {
 
         // Handle creates in batches of 500
         for chunk in creates.chunks(500) {
-            let records: Vec<serde_json::Value> = chunk.iter().map(|r| {
-                serde_json::json!({ "values": r.fields })
-            }).collect();
+            let records: Vec<serde_json::Value> = chunk
+                .iter()
+                .map(|r| serde_json::json!({ "values": r.fields }))
+                .collect();
             let body = serde_json::json!({
                 "docid": req.base_id,
                 "sheet_id": req.table_id,
                 "records": records,
             });
-            let resp = self.post("/cgi-bin/wedoc/smartsheet/add_records", &body).await?;
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+            let resp = self
+                .post("/cgi-bin/wedoc/smartsheet/add_records", &body)
+                .await?;
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
             let data: AddRecordsResp = serde_json::from_str(&text)?;
             check_errcode(data.errcode, data.errmsg, text)?;
             results.extend(data.records.into_iter().map(wc_record_to_data_record));
@@ -213,19 +241,27 @@ impl DataTableService for WeComClient {
 
         // Handle updates in batches of 500
         for chunk in updates.chunks(500) {
-            let records: Vec<serde_json::Value> = chunk.iter().map(|r| {
-                serde_json::json!({
-                    "record_id": r.id,
-                    "values": r.fields,
+            let records: Vec<serde_json::Value> = chunk
+                .iter()
+                .map(|r| {
+                    serde_json::json!({
+                        "record_id": r.id,
+                        "values": r.fields,
+                    })
                 })
-            }).collect();
+                .collect();
             let body = serde_json::json!({
                 "docid": req.base_id,
                 "sheet_id": req.table_id,
                 "records": records,
             });
-            let resp = self.post("/cgi-bin/wedoc/smartsheet/update_records", &body).await?;
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+            let resp = self
+                .post("/cgi-bin/wedoc/smartsheet/update_records", &body)
+                .await?;
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
             let data: UpdateRecordsResp = serde_json::from_str(&text)?;
             check_errcode(data.errcode, data.errmsg, text)?;
             results.extend(data.records.into_iter().map(wc_record_to_data_record));
@@ -234,14 +270,24 @@ impl DataTableService for WeComClient {
         Ok(results)
     }
 
-    async fn delete_records(&self, base_id: &str, table_id: &str, record_ids: &[String]) -> ImResult<()> {
+    async fn delete_records(
+        &self,
+        base_id: &str,
+        table_id: &str,
+        record_ids: &[String],
+    ) -> ImResult<()> {
         let body = serde_json::json!({
             "docid": base_id,
             "sheet_id": table_id,
             "record_ids": record_ids,
         });
-        let resp = self.post("/cgi-bin/wedoc/smartsheet/delete_records", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let resp = self
+            .post("/cgi-bin/wedoc/smartsheet/delete_records", &body)
+            .await?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: DeleteRecordsResp = serde_json::from_str(&text)?;
         check_errcode(data.errcode, data.errmsg, text)?;
         Ok(())

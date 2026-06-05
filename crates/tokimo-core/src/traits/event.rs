@@ -1,6 +1,6 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
-use crate::types::{ImEvent, RegisterCallbackRequest, EventSubscription};
+use crate::types::{EventSubscription, ImEvent, RegisterCallbackRequest};
+use async_trait::async_trait;
 
 /// Real-time event subscription (WebSocket / Webhook callbacks).
 #[async_trait]

@@ -1,10 +1,9 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
 use crate::types::{
-    DataBase, DataTable, DataField, DataRecord, Page,
-    CreateBaseRequest, ListBasesRequest, CreateTableRequest,
-    CreateFieldRequest, ListRecordsRequest, WriteRecordsRequest,
+    CreateBaseRequest, CreateFieldRequest, CreateTableRequest, DataBase, DataField, DataRecord,
+    DataTable, ListBasesRequest, ListRecordsRequest, Page, WriteRecordsRequest,
 };
+use async_trait::async_trait;
 
 /// Data table / AITable / Bitable / Smartsheet service.
 #[async_trait]
@@ -40,7 +39,12 @@ pub trait DataTableService: Send + Sync {
     async fn list_fields(&self, base_id: &str, table_id: &str) -> ImResult<Vec<DataField>>;
 
     /// Create a field.
-    async fn create_field(&self, base_id: &str, table_id: &str, req: CreateFieldRequest) -> ImResult<DataField>;
+    async fn create_field(
+        &self,
+        base_id: &str,
+        table_id: &str,
+        req: CreateFieldRequest,
+    ) -> ImResult<DataField>;
 
     // ── Record / Row operations ──
 
@@ -51,5 +55,10 @@ pub trait DataTableService: Send + Sync {
     async fn write_records(&self, req: WriteRecordsRequest) -> ImResult<Vec<DataRecord>>;
 
     /// Delete records by IDs.
-    async fn delete_records(&self, base_id: &str, table_id: &str, record_ids: &[String]) -> ImResult<()>;
+    async fn delete_records(
+        &self,
+        base_id: &str,
+        table_id: &str,
+        record_ids: &[String],
+    ) -> ImResult<()>;
 }

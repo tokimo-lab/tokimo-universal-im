@@ -2,27 +2,27 @@
 //!
 //! Lark/Feishu (飞书) provider implementation for the Tokimo Universal IM library.
 
-mod client;
-mod auth;
-mod messaging;
-mod contact;
-mod group;
-mod calendar;
-mod task;
-mod meeting;
-mod chat_list;
-mod media;
-mod message_ext;
-mod document;
-mod department;
-mod meeting_room;
 mod approval;
 mod attendance;
+mod auth;
+mod calendar;
+mod chat_list;
+mod client;
+mod contact;
 mod data_table;
-mod wiki;
+mod department;
+mod document;
 mod email;
 mod event;
+mod group;
+mod media;
+mod meeting;
+mod meeting_room;
+mod message_ext;
+mod messaging;
 mod provider;
+mod task;
+mod wiki;
 
 pub use client::LarkClient;
 pub use client::LarkRegion;

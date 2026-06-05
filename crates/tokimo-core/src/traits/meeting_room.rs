@@ -1,6 +1,6 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
-use crate::types::{MeetingRoom, Page, SearchRoomRequest, BookRoomRequest};
+use crate::types::{BookRoomRequest, MeetingRoom, Page, SearchRoomRequest};
+use async_trait::async_trait;
 
 /// Meeting room search and booking.
 #[async_trait]

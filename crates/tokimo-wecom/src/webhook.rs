@@ -1,19 +1,26 @@
+use crate::client::WeComClient;
 use async_trait::async_trait;
 use tokimo_core::{
-    WebhookService, ImResult, ImError,
-    WebhookMessageRequest, WebhookMessageResponse, MessageContent,
+    ImError, ImResult, MessageContent, WebhookMessageRequest, WebhookMessageResponse,
+    WebhookService,
 };
-use crate::client::WeComClient;
 
 #[async_trait]
 impl WebhookService for WeComClient {
     async fn send_webhook(&self, req: WebhookMessageRequest) -> ImResult<WebhookMessageResponse> {
         let body = build_webhook_body(&req)?;
         let resp = self.post_no_auth(&req.webhook_url, &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: serde_json::Value = serde_json::from_str(&text)?;
         let errcode = data.get("errcode").and_then(|v| v.as_i64()).unwrap_or(-1);
-        let errmsg = data.get("errmsg").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let errmsg = data
+            .get("errmsg")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
 
         if errcode != 0 {
             return Ok(WebhookMessageResponse {
@@ -54,14 +61,12 @@ fn build_webhook_body(req: &WebhookMessageRequest) -> ImResult<serde_json::Value
                 }
             }))
         }
-        MessageContent::Markdown(mc) => {
-            Ok(serde_json::json!({
-                "msgtype": "markdown",
-                "markdown": {
-                    "content": mc.text,
-                }
-            }))
-        }
+        MessageContent::Markdown(mc) => Ok(serde_json::json!({
+            "msgtype": "markdown",
+            "markdown": {
+                "content": mc.text,
+            }
+        })),
         MessageContent::Image(ic) => {
             // WeCom webhook image requires base64 + md5 in the media_key field.
             // Convention: media_key = "base64:<base64data>:md5:<md5hash>"
@@ -75,12 +80,10 @@ fn build_webhook_body(req: &WebhookMessageRequest) -> ImResult<serde_json::Value
                 }
             }))
         }
-        other => {
-            Err(ImError::NotSupported {
-                feature: format!("webhook message type: {:?}", std::mem::discriminant(other)),
-                platform: "wecom".into(),
-            })
-        }
+        other => Err(ImError::NotSupported {
+            feature: format!("webhook message type: {:?}", std::mem::discriminant(other)),
+            platform: "wecom".into(),
+        }),
     }
 }
 

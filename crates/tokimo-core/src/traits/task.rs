@@ -1,9 +1,6 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
-use crate::types::{
-    Task, Page,
-    CreateTaskRequest, UpdateTaskRequest, ListTasksRequest,
-};
+use crate::types::{CreateTaskRequest, ListTasksRequest, Page, Task, UpdateTaskRequest};
+use async_trait::async_trait;
 
 /// Task / to-do operations.
 #[async_trait]

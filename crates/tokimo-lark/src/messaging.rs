@@ -1,13 +1,11 @@
+use crate::client::LarkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    MessagingService, ImResult, ImError,
-    Message, MessageContent, MessageSender, TextContent, MarkdownContent,
-    ImageContent, FileContent, AudioContent, VideoContent,
-    Page, SendMessageRequest, SendMessageResponse,
-    ListMessagesRequest, RecallMessageRequest, ChatTarget,
+    AudioContent, ChatTarget, FileContent, ImError, ImResult, ImageContent, ListMessagesRequest,
+    MarkdownContent, Message, MessageContent, MessageSender, MessagingService, Page,
+    RecallMessageRequest, SendMessageRequest, SendMessageResponse, TextContent, VideoContent,
 };
-use crate::client::LarkClient;
 
 #[derive(Deserialize)]
 struct LarkResp<T> {
@@ -54,39 +52,65 @@ fn parse_lark_content(msg_type: &str, raw: &str) -> MessageContent {
     let val: serde_json::Value = serde_json::from_str(raw).unwrap_or(serde_json::Value::Null);
     match msg_type {
         "text" => MessageContent::Text(TextContent {
-            text: val.get("text").and_then(|v| v.as_str()).unwrap_or(raw).to_string(),
+            text: val
+                .get("text")
+                .and_then(|v| v.as_str())
+                .unwrap_or(raw)
+                .to_string(),
             mentions: vec![],
         }),
         "post" | "markdown" => MessageContent::Markdown(MarkdownContent {
             title: val.get("title").and_then(|v| v.as_str()).map(String::from),
-            text: val.get("text").and_then(|v| v.as_str())
+            text: val
+                .get("text")
+                .and_then(|v| v.as_str())
                 .or_else(|| val.get("content").and_then(|v| v.as_str()))
                 .unwrap_or(raw)
                 .to_string(),
         }),
         "image" => MessageContent::Image(ImageContent {
-            media_key: val.get("image_key").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
+            media_key: val
+                .get("image_key")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string(),
             name: None,
             url: None,
         }),
         "file" => MessageContent::File(FileContent {
-            media_key: val.get("file_key").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
-            name: val.get("file_name").and_then(|v| v.as_str()).map(String::from),
+            media_key: val
+                .get("file_key")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string(),
+            name: val
+                .get("file_name")
+                .and_then(|v| v.as_str())
+                .map(String::from),
             size: None,
             mime_type: None,
         }),
         "audio" => MessageContent::Audio(AudioContent {
-            media_key: val.get("file_key").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
+            media_key: val
+                .get("file_key")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string(),
             duration_ms: None,
         }),
         "media" => MessageContent::Video(VideoContent {
-            media_key: val.get("file_key").and_then(|v| v.as_str()).unwrap_or_default().to_string(),
+            media_key: val
+                .get("file_key")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string(),
             name: None,
-            cover_key: val.get("image_key").and_then(|v| v.as_str()).map(String::from),
+            cover_key: val
+                .get("image_key")
+                .and_then(|v| v.as_str())
+                .map(String::from),
         }),
-        "interactive" => {
-            MessageContent::Card(val)
-        }
+        "interactive" => MessageContent::Card(val),
         other => MessageContent::Unknown {
             msg_type: other.to_string(),
             raw: val,
@@ -105,7 +129,11 @@ impl From<LarkMessage> for Message {
             id: m.message_id.unwrap_or_default(),
             chat_id: m.chat_id.unwrap_or_default(),
             sender: MessageSender {
-                id: m.sender.as_ref().and_then(|s| s.id.clone()).unwrap_or_default(),
+                id: m
+                    .sender
+                    .as_ref()
+                    .and_then(|s| s.id.clone())
+                    .unwrap_or_default(),
                 name: None,
                 is_bot: m.sender.as_ref().and_then(|s| s.sender_type.as_deref()) == Some("app"),
             },
@@ -118,9 +146,7 @@ impl From<LarkMessage> for Message {
 
 pub(crate) fn build_content(content: &MessageContent) -> ImResult<(&'static str, String)> {
     match content {
-        MessageContent::Text(tc) => {
-            Ok(("text", serde_json::json!({"text": tc.text}).to_string()))
-        }
+        MessageContent::Text(tc) => Ok(("text", serde_json::json!({"text": tc.text}).to_string())),
         MessageContent::Markdown(md) => {
             // Convert to post format for maximum compatibility
             let title = md.title.as_deref().unwrap_or("");
@@ -132,15 +158,18 @@ pub(crate) fn build_content(content: &MessageContent) -> ImResult<(&'static str,
             });
             Ok(("post", post.to_string()))
         }
-        MessageContent::Image(img) => {
-            Ok(("image", serde_json::json!({"image_key": img.media_key}).to_string()))
-        }
-        MessageContent::File(f) => {
-            Ok(("file", serde_json::json!({"file_key": f.media_key}).to_string()))
-        }
-        MessageContent::Audio(a) => {
-            Ok(("audio", serde_json::json!({"file_key": a.media_key}).to_string()))
-        }
+        MessageContent::Image(img) => Ok((
+            "image",
+            serde_json::json!({"image_key": img.media_key}).to_string(),
+        )),
+        MessageContent::File(f) => Ok((
+            "file",
+            serde_json::json!({"file_key": f.media_key}).to_string(),
+        )),
+        MessageContent::Audio(a) => Ok((
+            "audio",
+            serde_json::json!({"file_key": a.media_key}).to_string(),
+        )),
         MessageContent::Video(v) => {
             let mut j = serde_json::json!({"file_key": v.media_key});
             if let Some(ref ck) = v.cover_key {
@@ -148,9 +177,7 @@ pub(crate) fn build_content(content: &MessageContent) -> ImResult<(&'static str,
             }
             Ok(("media", j.to_string()))
         }
-        MessageContent::Card(val) => {
-            Ok(("interactive", val.to_string()))
-        }
+        MessageContent::Card(val) => Ok(("interactive", val.to_string())),
         _ => Err(ImError::NotSupported {
             feature: "unknown message type".into(),
             platform: "lark".into(),
@@ -174,9 +201,15 @@ impl MessagingService for LarkClient {
             "content": content,
         });
 
-        let path = format!("/open-apis/im/v1/messages?receive_id_type={}", receive_id_type);
+        let path = format!(
+            "/open-apis/im/v1/messages?receive_id_type={}",
+            receive_id_type
+        );
         let resp = self.post(&path, &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<SendData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -210,7 +243,10 @@ impl MessagingService for LarkClient {
         }
 
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<ListData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -233,7 +269,10 @@ impl MessagingService for LarkClient {
     async fn recall_message(&self, req: RecallMessageRequest) -> ImResult<()> {
         let path = format!("/open-apis/im/v1/messages/{}", req.message_id);
         let resp = self.delete(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<serde_json::Value> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {

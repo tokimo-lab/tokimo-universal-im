@@ -1,7 +1,7 @@
+use crate::client::WeComClient;
 use async_trait::async_trait;
 use serde::Deserialize;
-use tokimo_core::{AuthService, ImResult, ImError, AccessToken, Credentials};
-use crate::client::WeComClient;
+use tokimo_core::{AccessToken, AuthService, Credentials, ImError, ImResult};
 
 #[derive(Deserialize)]
 struct TokenResponse {
@@ -18,9 +18,16 @@ impl AuthService for WeComClient {
             "{}/cgi-bin/gettoken?corpid={}&corpsecret={}",
             self.base_url, credentials.client_id, credentials.client_secret
         );
-        let resp = self.http.get(&url).send().await
+        let resp = self
+            .http
+            .get(&url)
+            .send()
+            .await
             .map_err(|e| ImError::Network(e.to_string()))?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: TokenResponse = serde_json::from_str(&text)?;
         if data.errcode.unwrap_or(0) != 0 {
             return Err(ImError::Auth {
@@ -31,9 +38,9 @@ impl AuthService for WeComClient {
             message: "no access_token in response".into(),
         })?;
         self.set_token(token_str.clone()).await;
-        let expires_at = data.expires_in.map(|secs| {
-            chrono::Utc::now() + chrono::Duration::seconds(secs)
-        });
+        let expires_at = data
+            .expires_in
+            .map(|secs| chrono::Utc::now() + chrono::Duration::seconds(secs));
         Ok(AccessToken {
             token: token_str,
             expires_at,
@@ -46,6 +53,7 @@ impl AuthService for WeComClient {
         self.get_access_token(&Credentials {
             client_id: self.corp_id.clone(),
             client_secret: self.corp_secret.clone(),
-        }).await
+        })
+        .await
     }
 }

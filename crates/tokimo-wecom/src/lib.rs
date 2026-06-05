@@ -2,22 +2,22 @@
 //!
 //! WeCom (企业微信) provider implementation for the Tokimo Universal IM library.
 
-mod client;
 mod auth;
-mod messaging;
-mod contact;
-mod group;
 mod calendar;
-mod task;
-mod meeting;
 mod chat_list;
-mod media;
-mod document;
-mod webhook;
-mod department;
+mod client;
+mod contact;
 mod data_table;
+mod department;
+mod document;
 mod event;
+mod group;
+mod media;
+mod meeting;
+mod messaging;
 mod provider;
+mod task;
+mod webhook;
 
 pub use client::WeComClient;
 pub use provider::WeComProvider;

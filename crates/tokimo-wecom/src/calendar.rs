@@ -1,11 +1,10 @@
+use crate::client::WeComClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    CalendarService, ImResult, ImError,
-    CalendarEvent, EventAttendee, AttendeeStatus, Page, BusySlot,
-    CreateEventRequest, UpdateEventRequest, ListEventsRequest, FreeBusyRequest,
+    AttendeeStatus, BusySlot, CalendarEvent, CalendarService, CreateEventRequest, EventAttendee,
+    FreeBusyRequest, ImError, ImResult, ListEventsRequest, Page, UpdateEventRequest,
 };
-use crate::client::WeComClient;
 
 #[derive(Deserialize)]
 struct ScheduleIdListResp {
@@ -44,7 +43,7 @@ struct WcAttendee {
 }
 
 fn ts_to_dt(ts: i64) -> chrono::DateTime<chrono::Utc> {
-    chrono::DateTime::from_timestamp(ts, 0).unwrap_or_else(|| chrono::Utc::now())
+    chrono::DateTime::from_timestamp(ts, 0).unwrap_or_else(chrono::Utc::now)
 }
 
 impl From<WcSchedule> for CalendarEvent {
@@ -57,16 +56,20 @@ impl From<WcSchedule> for CalendarEvent {
             end_time: s.end_time.map(ts_to_dt).unwrap_or_else(chrono::Utc::now),
             location: s.location,
             is_all_day: s.is_whole_day.unwrap_or(0) == 1,
-            attendees: s.attendees.into_iter().map(|a| EventAttendee {
-                user_id: a.userid.unwrap_or_default(),
-                name: None,
-                status: match a.response_status.unwrap_or(0) {
-                    1 => AttendeeStatus::Accepted,
-                    2 => AttendeeStatus::Declined,
-                    3 => AttendeeStatus::Tentative,
-                    _ => AttendeeStatus::Unknown,
-                },
-            }).collect(),
+            attendees: s
+                .attendees
+                .into_iter()
+                .map(|a| EventAttendee {
+                    user_id: a.userid.unwrap_or_default(),
+                    name: None,
+                    status: match a.response_status.unwrap_or(0) {
+                        1 => AttendeeStatus::Accepted,
+                        2 => AttendeeStatus::Declined,
+                        3 => AttendeeStatus::Tentative,
+                        _ => AttendeeStatus::Unknown,
+                    },
+                })
+                .collect(),
             extra: serde_json::Value::Null,
         }
     }
@@ -88,12 +91,22 @@ impl CalendarService for WeComClient {
         });
         let resp = self.post("/cgi-bin/oa/schedule/add", &body).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let val: serde_json::Value = serde_json::from_str(&text)?;
-        let schedule_id = val.get("schedule_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let schedule_id = val
+            .get("schedule_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
         Ok(CalendarEvent {
             id: schedule_id,
             title: req.title,
@@ -112,11 +125,19 @@ impl CalendarService for WeComClient {
             "start_time": req.start_time.format("%Y-%m-%d %H:%M:%S").to_string(),
             "end_time": req.end_time.format("%Y-%m-%d %H:%M:%S").to_string(),
         });
-        let resp = self.post("/cgi-bin/oa/schedule/get_by_range", &body).await?;
+        let resp = self
+            .post("/cgi-bin/oa/schedule/get_by_range", &body)
+            .await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let data: ScheduleIdListResp = serde_json::from_str(&text)?;
         if data.errcode.unwrap_or(0) != 0 {
@@ -127,13 +148,20 @@ impl CalendarService for WeComClient {
         }
         // Need to fetch details for each schedule
         if data.schedule_id_list.is_empty() {
-            return Ok(Page { items: vec![], has_more: false, next_cursor: None });
+            return Ok(Page {
+                items: vec![],
+                has_more: false,
+                next_cursor: None,
+            });
         }
         let detail_body = serde_json::json!({
             "schedule_id_list": data.schedule_id_list,
         });
         let detail_resp = self.post("/cgi-bin/oa/schedule/get", &detail_body).await?;
-        let detail_text = detail_resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let detail_text = detail_resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let details: ScheduleDetailResp = serde_json::from_str(&detail_text)?;
         Ok(Page {
             items: details.schedule.into_iter().map(Into::into).collect(),
@@ -147,28 +175,57 @@ impl CalendarService for WeComClient {
             "schedule_id_list": [event_id],
         });
         let resp = self.post("/cgi-bin/oa/schedule/get", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: ScheduleDetailResp = serde_json::from_str(&text)?;
-        data.schedule.into_iter().next().map(Into::into).ok_or_else(|| ImError::NotFound {
-            resource: format!("schedule {}", event_id),
-        })
+        data.schedule
+            .into_iter()
+            .next()
+            .map(Into::into)
+            .ok_or_else(|| ImError::NotFound {
+                resource: format!("schedule {}", event_id),
+            })
     }
 
     async fn update_event(&self, req: UpdateEventRequest) -> ImResult<CalendarEvent> {
         let mut sched = serde_json::Map::new();
         sched.insert("schedule_id".into(), serde_json::json!(req.event_id));
-        if let Some(ref t) = req.title { sched.insert("summary".into(), serde_json::json!(t)); }
-        if let Some(ref d) = req.description { sched.insert("description".into(), serde_json::json!(d)); }
-        if let Some(ref st) = req.start_time { sched.insert("start_time".into(), serde_json::json!(st.timestamp().to_string())); }
-        if let Some(ref et) = req.end_time { sched.insert("end_time".into(), serde_json::json!(et.timestamp().to_string())); }
-        if let Some(ref l) = req.location { sched.insert("location".into(), serde_json::json!(l)); }
+        if let Some(ref t) = req.title {
+            sched.insert("summary".into(), serde_json::json!(t));
+        }
+        if let Some(ref d) = req.description {
+            sched.insert("description".into(), serde_json::json!(d));
+        }
+        if let Some(ref st) = req.start_time {
+            sched.insert(
+                "start_time".into(),
+                serde_json::json!(st.timestamp().to_string()),
+            );
+        }
+        if let Some(ref et) = req.end_time {
+            sched.insert(
+                "end_time".into(),
+                serde_json::json!(et.timestamp().to_string()),
+            );
+        }
+        if let Some(ref l) = req.location {
+            sched.insert("location".into(), serde_json::json!(l));
+        }
 
         let body = serde_json::json!({ "schedule": sched });
         let resp = self.post("/cgi-bin/oa/schedule/update", &body).await?;
         let status = resp.status();
         if !status.is_success() {
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         // Fetch updated event
         self.get_event(&req.event_id).await
@@ -178,8 +235,14 @@ impl CalendarService for WeComClient {
         let body = serde_json::json!({ "schedule_id": event_id });
         let resp = self.post("/cgi-bin/oa/schedule/del", &body).await?;
         if !resp.status().is_success() {
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
-            return Err(ImError::Platform { code: 0, message: text });
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
+            return Err(ImError::Platform {
+                code: 0,
+                message: text,
+            });
         }
         Ok(())
     }
@@ -190,13 +253,21 @@ impl CalendarService for WeComClient {
             "start_time": req.start_time.format("%Y-%m-%d %H:%M:%S").to_string(),
             "end_time": req.end_time.format("%Y-%m-%d %H:%M:%S").to_string(),
         });
-        let resp = self.post("/cgi-bin/oa/schedule/check_availability", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let resp = self
+            .post("/cgi-bin/oa/schedule/check_availability", &body)
+            .await?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let val: serde_json::Value = serde_json::from_str(&text)?;
         let mut slots = vec![];
         if let Some(arr) = val.get("user_busy_list").and_then(|v| v.as_array()) {
             for item in arr {
-                let uid = item.get("userid").and_then(|v| v.as_str()).unwrap_or_default();
+                let uid = item
+                    .get("userid")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
                 if let Some(busy) = item.get("busy_slots").and_then(|v| v.as_array()) {
                     for slot in busy {
                         let st = slot.get("start_time").and_then(|v| v.as_i64()).unwrap_or(0);
@@ -205,7 +276,10 @@ impl CalendarService for WeComClient {
                             user_id: uid.to_string(),
                             start_time: ts_to_dt(st),
                             end_time: ts_to_dt(et),
-                            subject: slot.get("subject").and_then(|v| v.as_str()).map(String::from),
+                            subject: slot
+                                .get("subject")
+                                .and_then(|v| v.as_str())
+                                .map(String::from),
                         });
                     }
                 }

@@ -1,14 +1,12 @@
+use crate::client::LarkClient;
+use crate::messaging::build_content;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    MessageExtService, ImResult, ImError,
-    Message, SendMessageResponse,
-    ReplyMessageRequest, ForwardMessageRequest,
-    MessageReaction, AddReactionRequest, MessageReadStatus, ReadUser,
-    BatchGetMessagesRequest, MessagePin, Page,
+    AddReactionRequest, BatchGetMessagesRequest, ForwardMessageRequest, ImError, ImResult, Message,
+    MessageExtService, MessagePin, MessageReaction, MessageReadStatus, Page, ReadUser,
+    ReplyMessageRequest, SendMessageResponse,
 };
-use crate::client::LarkClient;
-use crate::messaging::build_content;
 
 #[derive(Deserialize)]
 struct LarkResp<T> {
@@ -105,9 +103,15 @@ impl MessageExtService for LarkClient {
             "msg_type": msg_type,
             "content": content,
         });
-        let path = format!("/open-apis/im/v1/messages/{}/reply", req.reply_to_message_id);
+        let path = format!(
+            "/open-apis/im/v1/messages/{}/reply",
+            req.reply_to_message_id
+        );
         let resp = self.post(&path, &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<SendData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -138,7 +142,10 @@ impl MessageExtService for LarkClient {
             req.message_id, receive_id_type
         );
         let resp = self.post(&path, &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<SendData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -158,7 +165,10 @@ impl MessageExtService for LarkClient {
         });
         let path = format!("/open-apis/im/v1/messages/{}/reactions", req.message_id);
         let resp = self.post(&path, &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<ReactionData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -167,7 +177,10 @@ impl MessageExtService for LarkClient {
             });
         }
         let rd = data.data.unwrap_or(ReactionData {
-            reaction_id: None, reaction_type: None, operator: None, action_time: None,
+            reaction_id: None,
+            reaction_type: None,
+            operator: None,
+            action_time: None,
         });
         Ok(MessageReaction {
             reaction_id: rd.reaction_id.unwrap_or_default(),
@@ -179,9 +192,15 @@ impl MessageExtService for LarkClient {
     }
 
     async fn remove_reaction(&self, message_id: &str, reaction_id: &str) -> ImResult<()> {
-        let path = format!("/open-apis/im/v1/messages/{}/reactions/{}", message_id, reaction_id);
+        let path = format!(
+            "/open-apis/im/v1/messages/{}/reactions/{}",
+            message_id, reaction_id
+        );
         let resp = self.delete(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<serde_json::Value> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -195,7 +214,10 @@ impl MessageExtService for LarkClient {
     async fn list_reactions(&self, message_id: &str) -> ImResult<Vec<MessageReaction>> {
         let path = format!("/open-apis/im/v1/messages/{}/reactions", message_id);
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<ReactionListData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -204,19 +226,32 @@ impl MessageExtService for LarkClient {
             });
         }
         let items = data.data.unwrap_or(ReactionListData { items: vec![] });
-        Ok(items.items.into_iter().map(|r| MessageReaction {
-            reaction_id: r.reaction_id.unwrap_or_default(),
-            message_id: message_id.to_string(),
-            emoji_type: r.reaction_type.and_then(|rt| rt.emoji_type).unwrap_or_default(),
-            user_id: r.operator.and_then(|o| o.operator_id).unwrap_or_default(),
-            timestamp: r.action_time.and_then(|s| s.parse().ok()),
-        }).collect())
+        Ok(items
+            .items
+            .into_iter()
+            .map(|r| MessageReaction {
+                reaction_id: r.reaction_id.unwrap_or_default(),
+                message_id: message_id.to_string(),
+                emoji_type: r
+                    .reaction_type
+                    .and_then(|rt| rt.emoji_type)
+                    .unwrap_or_default(),
+                user_id: r.operator.and_then(|o| o.operator_id).unwrap_or_default(),
+                timestamp: r.action_time.and_then(|s| s.parse().ok()),
+            })
+            .collect())
     }
 
     async fn get_read_status(&self, message_id: &str) -> ImResult<MessageReadStatus> {
-        let path = format!("/open-apis/im/v1/messages/{}/read_users?user_id_type=open_id", message_id);
+        let path = format!(
+            "/open-apis/im/v1/messages/{}/read_users?user_id_type=open_id",
+            message_id
+        );
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<ReadData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -228,21 +263,34 @@ impl MessageExtService for LarkClient {
         let read_count = items.items.len() as u32;
         Ok(MessageReadStatus {
             message_id: message_id.to_string(),
-            read_users: items.items.into_iter().map(|r| ReadUser {
-                user_id: r.user_id.unwrap_or_default(),
-                read_at: r.timestamp.and_then(|s| s.parse().ok()),
-            }).collect(),
+            read_users: items
+                .items
+                .into_iter()
+                .map(|r| ReadUser {
+                    user_id: r.user_id.unwrap_or_default(),
+                    read_at: r.timestamp.and_then(|s| s.parse().ok()),
+                })
+                .collect(),
             total_count: 0, // Not available from this endpoint
             read_count,
         })
     }
 
     async fn batch_get_messages(&self, req: BatchGetMessagesRequest) -> ImResult<Vec<Message>> {
-        let resp = self.get(&format!(
-            "/open-apis/im/v1/messages/mget?{}",
-            req.message_ids.iter().map(|id| format!("message_ids={}", id)).collect::<Vec<_>>().join("&")
-        )).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let resp = self
+            .get(&format!(
+                "/open-apis/im/v1/messages/mget?{}",
+                req.message_ids
+                    .iter()
+                    .map(|id| format!("message_ids={}", id))
+                    .collect::<Vec<_>>()
+                    .join("&")
+            ))
+            .await?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<BatchData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -264,7 +312,10 @@ impl MessageExtService for LarkClient {
     async fn pin_message(&self, message_id: &str) -> ImResult<MessagePin> {
         let body = serde_json::json!({ "message_id": message_id });
         let resp = self.post("/open-apis/im/v1/pins", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<PinData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -272,8 +323,13 @@ impl MessageExtService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let pin = data.data.and_then(|d| d.pin).ok_or_else(|| ImError::Internal("empty pin data".into()))?;
-        let created_at = pin.create_time.as_deref()
+        let pin = data
+            .data
+            .and_then(|d| d.pin)
+            .ok_or_else(|| ImError::Internal("empty pin data".into()))?;
+        let created_at = pin
+            .create_time
+            .as_deref()
             .and_then(|s| s.parse::<i64>().ok())
             .and_then(|ts| chrono::DateTime::from_timestamp(ts, 0));
         Ok(MessagePin {
@@ -288,7 +344,10 @@ impl MessageExtService for LarkClient {
     async fn unpin_message(&self, message_id: &str) -> ImResult<()> {
         let path = format!("/open-apis/im/v1/pins/{}", message_id);
         let resp = self.delete(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<serde_json::Value> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -302,7 +361,10 @@ impl MessageExtService for LarkClient {
     async fn list_pins(&self, chat_id: &str) -> ImResult<Page<MessagePin>> {
         let path = format!("/open-apis/im/v1/pins?chat_id={}", chat_id);
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<PinListData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -310,19 +372,29 @@ impl MessageExtService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let list = data.data.unwrap_or(PinListData { items: vec![], page_token: None, has_more: None });
-        let items: Vec<MessagePin> = list.items.into_iter().map(|pin| {
-            let created_at = pin.create_time.as_deref()
-                .and_then(|s| s.parse::<i64>().ok())
-                .and_then(|ts| chrono::DateTime::from_timestamp(ts, 0));
-            MessagePin {
-                pin_id: pin.message_id.clone().unwrap_or_default(),
-                message_id: pin.message_id.unwrap_or_default(),
-                chat_id: pin.chat_id.unwrap_or_else(|| chat_id.to_string()),
-                operator_id: pin.operator_id,
-                created_at,
-            }
-        }).collect();
+        let list = data.data.unwrap_or(PinListData {
+            items: vec![],
+            page_token: None,
+            has_more: None,
+        });
+        let items: Vec<MessagePin> = list
+            .items
+            .into_iter()
+            .map(|pin| {
+                let created_at = pin
+                    .create_time
+                    .as_deref()
+                    .and_then(|s| s.parse::<i64>().ok())
+                    .and_then(|ts| chrono::DateTime::from_timestamp(ts, 0));
+                MessagePin {
+                    pin_id: pin.message_id.clone().unwrap_or_default(),
+                    message_id: pin.message_id.unwrap_or_default(),
+                    chat_id: pin.chat_id.unwrap_or_else(|| chat_id.to_string()),
+                    operator_id: pin.operator_id,
+                    created_at,
+                }
+            })
+            .collect();
         Ok(Page {
             items,
             has_more: list.has_more.unwrap_or(false),

@@ -1,11 +1,10 @@
+use crate::client::DingTalkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    ReportService, ImResult, ImError,
-    Report, ReportTemplate, ReportStatistics, Page,
-    ListReportsRequest, CreateReportRequest,
+    CreateReportRequest, ImError, ImResult, ListReportsRequest, Page, Report, ReportService,
+    ReportStatistics, ReportTemplate,
 };
-use crate::client::DingTalkClient;
 
 #[allow(dead_code)]
 #[derive(Deserialize)]
@@ -45,9 +44,9 @@ fn parse_dt_time(s: &str) -> Option<chrono::DateTime<chrono::Utc>> {
         .ok()
         .map(|dt| dt.with_timezone(&chrono::Utc))
         .or_else(|| {
-            s.parse::<i64>().ok().and_then(|ms| {
-                chrono::DateTime::from_timestamp_millis(ms)
-            })
+            s.parse::<i64>()
+                .ok()
+                .and_then(chrono::DateTime::from_timestamp_millis)
         })
 }
 
@@ -94,25 +93,41 @@ impl ReportService for DingTalkClient {
     async fn list_templates(&self) -> ImResult<Vec<ReportTemplate>> {
         let resp = self.get("/v1.0/report/templates").await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let data: DtTemplateListResponse = serde_json::from_str(&text)?;
-        Ok(data.templates.into_iter().map(|t| ReportTemplate {
-            id: t.id.unwrap_or_default(),
-            name: t.name.unwrap_or_default(),
-            fields: t.fields.unwrap_or(serde_json::Value::Null),
-        }).collect())
+        Ok(data
+            .templates
+            .into_iter()
+            .map(|t| ReportTemplate {
+                id: t.id.unwrap_or_default(),
+                name: t.name.unwrap_or_default(),
+                fields: t.fields.unwrap_or(serde_json::Value::Null),
+            })
+            .collect())
     }
 
     async fn get_template(&self, template_name: &str) -> ImResult<ReportTemplate> {
         let path = format!("/v1.0/report/templates/{}", template_name);
         let resp = self.get(&path).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let t: DtTemplate = serde_json::from_str(&text)?;
         Ok(ReportTemplate {
@@ -130,9 +145,15 @@ impl ReportService for DingTalkClient {
         });
         let resp = self.post("/v1.0/report/reports", &body).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let r: DtReport = serde_json::from_str(&text)?;
         Ok(r.into())
@@ -159,14 +180,22 @@ impl ReportService for DingTalkClient {
             body.insert("maxResults".into(), serde_json::json!(limit));
         }
 
-        let resp = self.post(
-            "/v1.0/report/reports/query",
-            &serde_json::Value::Object(body),
-        ).await?;
+        let resp = self
+            .post(
+                "/v1.0/report/reports/query",
+                &serde_json::Value::Object(body),
+            )
+            .await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let data: DtReportListResponse = serde_json::from_str(&text)?;
         Ok(Page {
@@ -180,9 +209,15 @@ impl ReportService for DingTalkClient {
         let path = format!("/v1.0/report/reports/{}", report_id);
         let resp = self.get(&path).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let r: DtReport = serde_json::from_str(&text)?;
         Ok(r.into())
@@ -192,9 +227,15 @@ impl ReportService for DingTalkClient {
         let path = format!("/v1.0/report/reports/{}/statistics", report_id);
         let resp = self.get(&path).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let s: DtStatistics = serde_json::from_str(&text)?;
         Ok(ReportStatistics {

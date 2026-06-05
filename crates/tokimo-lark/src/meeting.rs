@@ -1,11 +1,10 @@
+use crate::client::LarkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    MeetingService, ImResult, ImError,
-    Meeting, MeetingStatus, MeetingType, MeetingAttendee, Page,
-    CreateMeetingRequest, ListMeetingsRequest, UpdateMeetingMembersRequest,
+    CreateMeetingRequest, ImError, ImResult, ListMeetingsRequest, Meeting, MeetingAttendee,
+    MeetingService, MeetingStatus, MeetingType, Page, UpdateMeetingMembersRequest,
 };
-use crate::client::LarkClient;
 
 #[derive(Deserialize)]
 struct LarkResp<T> {
@@ -48,13 +47,21 @@ struct LarkParticipant {
 
 fn ts_str(s: &str) -> chrono::DateTime<chrono::Utc> {
     let ts: i64 = s.parse().unwrap_or(0);
-    chrono::DateTime::from_timestamp(ts, 0).unwrap_or_else(|| chrono::Utc::now())
+    chrono::DateTime::from_timestamp(ts, 0).unwrap_or_else(chrono::Utc::now)
 }
 
 impl From<LarkMeeting> for Meeting {
     fn from(m: LarkMeeting) -> Self {
-        let start = m.start_time.as_deref().map(ts_str).unwrap_or_else(chrono::Utc::now);
-        let end = m.end_time.as_deref().map(ts_str).unwrap_or_else(chrono::Utc::now);
+        let start = m
+            .start_time
+            .as_deref()
+            .map(ts_str)
+            .unwrap_or_else(chrono::Utc::now);
+        let end = m
+            .end_time
+            .as_deref()
+            .map(ts_str)
+            .unwrap_or_else(chrono::Utc::now);
         let dur = (end - start).num_seconds().max(0) as u64;
         Meeting {
             id: m.id.unwrap_or_default(),
@@ -68,12 +75,16 @@ impl From<LarkMeeting> for Meeting {
             status: MeetingStatus::Pending,
             meeting_type: MeetingType::Once,
             creator_id: None,
-            attendees: m.participants.into_iter().map(|p| MeetingAttendee {
-                user_id: p.id.unwrap_or_default(),
-                name: None,
-                joined: false,
-                cumulative_time_secs: None,
-            }).collect(),
+            attendees: m
+                .participants
+                .into_iter()
+                .map(|p| MeetingAttendee {
+                    user_id: p.id.unwrap_or_default(),
+                    name: None,
+                    joined: false,
+                    cumulative_time_secs: None,
+                })
+                .collect(),
             settings: None,
             extra: serde_json::Value::Null,
         }
@@ -93,10 +104,16 @@ impl MeetingService for LarkClient {
     async fn list_meetings(&self, req: ListMeetingsRequest) -> ImResult<Page<Meeting>> {
         let mut body = serde_json::Map::new();
         if let Some(ref st) = req.start_time {
-            body.insert("start_time".into(), serde_json::json!(st.timestamp().to_string()));
+            body.insert(
+                "start_time".into(),
+                serde_json::json!(st.timestamp().to_string()),
+            );
         }
         if let Some(ref et) = req.end_time {
-            body.insert("end_time".into(), serde_json::json!(et.timestamp().to_string()));
+            body.insert(
+                "end_time".into(),
+                serde_json::json!(et.timestamp().to_string()),
+            );
         }
         if let Some(ref cursor) = req.cursor {
             body.insert("page_token".into(), serde_json::json!(cursor));
@@ -104,8 +121,16 @@ impl MeetingService for LarkClient {
         if let Some(limit) = req.limit {
             body.insert("page_size".into(), serde_json::json!(limit));
         }
-        let resp = self.post("/open-apis/vc/v1/meetings/search", &serde_json::Value::Object(body)).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let resp = self
+            .post(
+                "/open-apis/vc/v1/meetings/search",
+                &serde_json::Value::Object(body),
+            )
+            .await?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<SearchData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -113,7 +138,11 @@ impl MeetingService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let search = data.data.unwrap_or(SearchData { meeting_list: vec![], page_token: None, has_more: None });
+        let search = data.data.unwrap_or(SearchData {
+            meeting_list: vec![],
+            page_token: None,
+            has_more: None,
+        });
         Ok(Page {
             items: search.meeting_list.into_iter().map(Into::into).collect(),
             has_more: search.has_more.unwrap_or(false),
@@ -124,7 +153,10 @@ impl MeetingService for LarkClient {
     async fn get_meeting(&self, meeting_id: &str) -> ImResult<Meeting> {
         let path = format!("/open-apis/vc/v1/meetings/{}", meeting_id);
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<MeetingData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -132,9 +164,12 @@ impl MeetingService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let meeting = data.data.and_then(|d| d.meeting).ok_or_else(|| ImError::NotFound {
-            resource: meeting_id.into(),
-        })?;
+        let meeting = data
+            .data
+            .and_then(|d| d.meeting)
+            .ok_or_else(|| ImError::NotFound {
+                resource: meeting_id.into(),
+            })?;
         Ok(meeting.into())
     }
 

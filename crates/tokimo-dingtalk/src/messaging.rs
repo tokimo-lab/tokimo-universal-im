@@ -1,12 +1,10 @@
+use crate::client::DingTalkClient;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tokimo_core::{
-    MessagingService, ImResult, ImError,
-    Message, MessageContent,
-    Page, SendMessageRequest, SendMessageResponse,
-    ListMessagesRequest, RecallMessageRequest, ChatTarget,
+    ChatTarget, ImError, ImResult, ListMessagesRequest, Message, MessageContent, MessagingService,
+    Page, RecallMessageRequest, SendMessageRequest, SendMessageResponse,
 };
-use crate::client::DingTalkClient;
 
 // --- Send by Bot ---
 
@@ -85,9 +83,10 @@ impl MessagingService for DingTalkClient {
         })?;
 
         let (msg_key, msg_param) = match &req.content {
-            MessageContent::Text(tc) => {
-                ("sampleText", serde_json::json!({ "content": tc.text }).to_string())
-            }
+            MessageContent::Text(tc) => (
+                "sampleText",
+                serde_json::json!({ "content": tc.text }).to_string(),
+            ),
             MessageContent::Markdown(md) => {
                 let title = md.title.as_deref().unwrap_or("通知");
                 (
@@ -95,12 +94,11 @@ impl MessagingService for DingTalkClient {
                     serde_json::json!({ "title": title, "text": md.text }).to_string(),
                 )
             }
-            MessageContent::Image(img) => {
-                (
-                    "sampleImageMsg",
-                    serde_json::json!({ "photoURL": img.url.as_deref().unwrap_or(&img.media_key) }).to_string(),
-                )
-            }
+            MessageContent::Image(img) => (
+                "sampleImageMsg",
+                serde_json::json!({ "photoURL": img.url.as_deref().unwrap_or(&img.media_key) })
+                    .to_string(),
+            ),
             _ => {
                 return Err(ImError::NotSupported {
                     feature: format!("message type {:?}", std::mem::discriminant(&req.content)),
@@ -122,9 +120,14 @@ impl MessagingService for DingTalkClient {
             msg_param,
         };
 
-        let resp = self.post("/v1.0/robot/oToMessages/batchSend", &body).await?;
+        let resp = self
+            .post("/v1.0/robot/oToMessages/batchSend", &body)
+            .await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
 
         if !status.is_success() {
             return Err(ImError::Platform {
@@ -148,7 +151,9 @@ impl MessagingService for DingTalkClient {
     async fn list_messages(&self, _req: ListMessagesRequest) -> ImResult<Page<Message>> {
         // DingTalk doesn't have a direct "list messages" REST API for bots.
         // Messages are received via callback/webhook. This returns an empty page.
-        tracing::warn!("DingTalk does not support list_messages via REST API; use webhook callbacks");
+        tracing::warn!(
+            "DingTalk does not support list_messages via REST API; use webhook callbacks"
+        );
         Ok(Page {
             items: vec![],
             has_more: false,
@@ -167,10 +172,15 @@ impl MessagingService for DingTalkClient {
             open_conversation_id: req.chat_id.as_deref(),
         };
 
-        let resp = self.post("/v1.0/robot/otoMessages/batchRecall", &body).await?;
+        let resp = self
+            .post("/v1.0/robot/otoMessages/batchRecall", &body)
+            .await?;
         let status = resp.status();
         if !status.is_success() {
-            let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+            let text = resp
+                .text()
+                .await
+                .map_err(|e| ImError::Network(e.to_string()))?;
             return Err(ImError::Platform {
                 code: status.as_u16() as i64,
                 message: text,

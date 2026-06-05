@@ -1,11 +1,10 @@
+use crate::client::LarkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    DepartmentService, ImResult, ImError,
-    DepartmentDetail, User, Page, Department,
-    ListDepartmentsRequest, ListDepartmentMembersRequest,
+    Department, DepartmentDetail, DepartmentService, ImError, ImResult,
+    ListDepartmentMembersRequest, ListDepartmentsRequest, Page, User,
 };
-use crate::client::LarkClient;
 
 #[derive(Deserialize)]
 struct LarkResp<T> {
@@ -85,11 +84,15 @@ impl From<LarkUser> for User {
             email: u.email,
             phone: u.mobile,
             avatar: u.avatar.and_then(|a| a.avatar_72),
-            departments: u.department_ids.into_iter().map(|id| Department {
-                id,
-                name: String::new(),
-                parent_id: None,
-            }).collect(),
+            departments: u
+                .department_ids
+                .into_iter()
+                .map(|id| Department {
+                    id,
+                    name: String::new(),
+                    parent_id: None,
+                })
+                .collect(),
             extra: serde_json::Value::Null,
         }
     }
@@ -97,7 +100,10 @@ impl From<LarkUser> for User {
 
 #[async_trait]
 impl DepartmentService for LarkClient {
-    async fn list_departments(&self, req: ListDepartmentsRequest) -> ImResult<Page<DepartmentDetail>> {
+    async fn list_departments(
+        &self,
+        req: ListDepartmentsRequest,
+    ) -> ImResult<Page<DepartmentDetail>> {
         let parent_id = req.parent_id.as_deref().unwrap_or("0");
         let mut path = format!(
             "/open-apis/contact/v3/departments/{}/children?page_size={}",
@@ -108,7 +114,10 @@ impl DepartmentService for LarkClient {
             path.push_str(&format!("&page_token={}", cursor));
         }
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<DeptListData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -116,7 +125,11 @@ impl DepartmentService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let list = data.data.unwrap_or(DeptListData { items: vec![], page_token: None, has_more: None });
+        let list = data.data.unwrap_or(DeptListData {
+            items: vec![],
+            page_token: None,
+            has_more: None,
+        });
         Ok(Page {
             items: list.items.into_iter().map(Into::into).collect(),
             has_more: list.has_more.unwrap_or(false),
@@ -127,7 +140,10 @@ impl DepartmentService for LarkClient {
     async fn get_department(&self, department_id: &str) -> ImResult<DepartmentDetail> {
         let path = format!("/open-apis/contact/v3/departments/{}", department_id);
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<DeptData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -135,13 +151,19 @@ impl DepartmentService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let dept = data.data.and_then(|d| d.department).ok_or_else(|| ImError::NotFound {
-            resource: department_id.into(),
-        })?;
+        let dept = data
+            .data
+            .and_then(|d| d.department)
+            .ok_or_else(|| ImError::NotFound {
+                resource: department_id.into(),
+            })?;
         Ok(dept.into())
     }
 
-    async fn list_department_members(&self, req: ListDepartmentMembersRequest) -> ImResult<Page<User>> {
+    async fn list_department_members(
+        &self,
+        req: ListDepartmentMembersRequest,
+    ) -> ImResult<Page<User>> {
         let mut path = format!(
             "/open-apis/contact/v3/users/find_by_department?department_id={}&page_size={}",
             req.department_id,
@@ -151,7 +173,10 @@ impl DepartmentService for LarkClient {
             path.push_str(&format!("&page_token={}", cursor));
         }
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<UserListData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -159,7 +184,11 @@ impl DepartmentService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let list = data.data.unwrap_or(UserListData { items: vec![], page_token: None, has_more: None });
+        let list = data.data.unwrap_or(UserListData {
+            items: vec![],
+            page_token: None,
+            has_more: None,
+        });
         Ok(Page {
             items: list.items.into_iter().map(Into::into).collect(),
             has_more: list.has_more.unwrap_or(false),

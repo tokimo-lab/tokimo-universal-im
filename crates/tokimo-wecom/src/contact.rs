@@ -1,10 +1,7 @@
+use crate::client::WeComClient;
 use async_trait::async_trait;
 use serde::Deserialize;
-use tokimo_core::{
-    ContactService, ImResult, ImError,
-    User, Page, SearchUserRequest,
-};
-use crate::client::WeComClient;
+use tokimo_core::{ContactService, ImError, ImResult, Page, SearchUserRequest, User};
 
 #[derive(Deserialize)]
 struct UserListResponse {
@@ -30,7 +27,10 @@ impl From<WcUser> for User {
             phone: None,
             avatar: None,
             departments: vec![],
-            extra: u.alias.map(|a| serde_json::json!({"alias": a})).unwrap_or(serde_json::Value::Null),
+            extra: u
+                .alias
+                .map(|a| serde_json::json!({"alias": a}))
+                .unwrap_or(serde_json::Value::Null),
         }
     }
 }
@@ -50,9 +50,15 @@ impl ContactService for WeComClient {
         let body = serde_json::json!({});
         let resp = self.post("/cgi-bin/user/list", &body).await?;
         let status = resp.status();
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         if !status.is_success() {
-            return Err(ImError::Platform { code: status.as_u16() as i64, message: text });
+            return Err(ImError::Platform {
+                code: status.as_u16() as i64,
+                message: text,
+            });
         }
         let data: UserListResponse = serde_json::from_str(&text)?;
         if data.errcode.unwrap_or(0) != 0 {

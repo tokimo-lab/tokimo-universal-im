@@ -1,9 +1,9 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
 use crate::types::{
-    Message, Page, SendMessageRequest, SendMessageResponse,
-    ListMessagesRequest, RecallMessageRequest,
+    ListMessagesRequest, Message, Page, RecallMessageRequest, SendMessageRequest,
+    SendMessageResponse,
 };
+use async_trait::async_trait;
 
 /// Core messaging operations — send, receive, recall.
 #[async_trait]

@@ -1,9 +1,8 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
 use crate::types::{
-    Report, ReportTemplate, ReportStatistics, Page,
-    ListReportsRequest, CreateReportRequest,
+    CreateReportRequest, ListReportsRequest, Page, Report, ReportStatistics, ReportTemplate,
 };
+use async_trait::async_trait;
 
 /// Report / daily / weekly management.
 #[async_trait]

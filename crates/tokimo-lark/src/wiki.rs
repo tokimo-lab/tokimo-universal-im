@@ -1,12 +1,10 @@
+use crate::client::LarkClient;
 use async_trait::async_trait;
 use serde::Deserialize;
 use tokimo_core::{
-    WikiService, ImResult, ImError,
-    WikiSpace, WikiNode, Page,
-    ListWikiSpacesRequest, ListWikiNodesRequest,
-    CreateWikiNodeRequest, MoveWikiNodeRequest, SearchWikiRequest,
+    CreateWikiNodeRequest, ImError, ImResult, ListWikiNodesRequest, ListWikiSpacesRequest,
+    MoveWikiNodeRequest, Page, SearchWikiRequest, WikiNode, WikiService, WikiSpace,
 };
-use crate::client::LarkClient;
 
 #[derive(Deserialize)]
 struct LarkResp<T> {
@@ -134,7 +132,10 @@ impl WikiService for LarkClient {
             path.push_str(&format!("&page_token={}", cursor));
         }
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<SpaceListData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -142,7 +143,11 @@ impl WikiService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let list = data.data.unwrap_or(SpaceListData { items: vec![], page_token: None, has_more: None });
+        let list = data.data.unwrap_or(SpaceListData {
+            items: vec![],
+            page_token: None,
+            has_more: None,
+        });
         Ok(Page {
             items: list.items.into_iter().map(Into::into).collect(),
             has_more: list.has_more.unwrap_or(false),
@@ -153,7 +158,10 @@ impl WikiService for LarkClient {
     async fn get_space(&self, space_id: &str) -> ImResult<WikiSpace> {
         let path = format!("/open-apis/wiki/v2/spaces/{}", space_id);
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<SpaceData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -161,9 +169,12 @@ impl WikiService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let space = data.data.and_then(|d| d.space).ok_or_else(|| ImError::NotFound {
-            resource: space_id.into(),
-        })?;
+        let space = data
+            .data
+            .and_then(|d| d.space)
+            .ok_or_else(|| ImError::NotFound {
+                resource: space_id.into(),
+            })?;
         Ok(space.into())
     }
 
@@ -180,7 +191,10 @@ impl WikiService for LarkClient {
             path.push_str(&format!("&parent_node_token={}", parent));
         }
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<NodeListData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -188,7 +202,11 @@ impl WikiService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let list = data.data.unwrap_or(NodeListData { items: vec![], page_token: None, has_more: None });
+        let list = data.data.unwrap_or(NodeListData {
+            items: vec![],
+            page_token: None,
+            has_more: None,
+        });
         Ok(Page {
             items: list.items.into_iter().map(Into::into).collect(),
             has_more: list.has_more.unwrap_or(false),
@@ -199,7 +217,10 @@ impl WikiService for LarkClient {
     async fn get_node(&self, space_id: &str, node_id: &str) -> ImResult<WikiNode> {
         let path = format!("/open-apis/wiki/v2/spaces/{}/nodes/{}", space_id, node_id);
         let resp = self.get(&path).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<NodeData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -207,9 +228,12 @@ impl WikiService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let node = data.data.and_then(|d| d.node).ok_or_else(|| ImError::NotFound {
-            resource: node_id.into(),
-        })?;
+        let node = data
+            .data
+            .and_then(|d| d.node)
+            .ok_or_else(|| ImError::NotFound {
+                resource: node_id.into(),
+            })?;
         Ok(node.into())
     }
 
@@ -221,7 +245,10 @@ impl WikiService for LarkClient {
         });
         let path = format!("/open-apis/wiki/v2/spaces/{}/nodes", req.space_id);
         let resp = self.post(&path, &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<NodeData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -229,7 +256,10 @@ impl WikiService for LarkClient {
                 message: data.msg.unwrap_or(text),
             });
         }
-        let node = data.data.and_then(|d| d.node).ok_or_else(|| ImError::Internal("empty node".into()))?;
+        let node = data
+            .data
+            .and_then(|d| d.node)
+            .ok_or_else(|| ImError::Internal("empty node".into()))?;
         Ok(node.into())
     }
 
@@ -242,7 +272,10 @@ impl WikiService for LarkClient {
             req.space_id, req.node_id,
         );
         let resp = self.post(&path, &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<serde_json::Value> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -259,8 +292,13 @@ impl WikiService for LarkClient {
             "count": req.limit.unwrap_or(20),
             "offset": req.cursor.as_deref().and_then(|s| s.parse::<u32>().ok()).unwrap_or(0),
         });
-        let resp = self.post("/open-apis/suite/docs-api/search/object", &body).await?;
-        let text = resp.text().await.map_err(|e| ImError::Network(e.to_string()))?;
+        let resp = self
+            .post("/open-apis/suite/docs-api/search/object", &body)
+            .await?;
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| ImError::Network(e.to_string()))?;
         let data: LarkResp<SearchData> = serde_json::from_str(&text)?;
         if data.code.unwrap_or(0) != 0 {
             return Err(ImError::Platform {
@@ -269,10 +307,14 @@ impl WikiService for LarkClient {
             });
         }
         let search = data.data.unwrap_or(SearchData {
-            docs_entities: vec![], has_more: None, count: None,
+            docs_entities: vec![],
+            has_more: None,
+            count: None,
         });
-        let items: Vec<WikiNode> = search.docs_entities.into_iter().map(|item| {
-            WikiNode {
+        let items: Vec<WikiNode> = search
+            .docs_entities
+            .into_iter()
+            .map(|item| WikiNode {
                 id: item.docs_token.unwrap_or_default(),
                 parent_id: None,
                 title: item.title.unwrap_or_default(),
@@ -282,8 +324,8 @@ impl WikiService for LarkClient {
                 creator: item.owner_id,
                 created_at: item.create_time.as_deref().and_then(ts_opt),
                 updated_at: item.edit_time.as_deref().and_then(ts_opt),
-            }
-        }).collect();
+            })
+            .collect();
         Ok(Page {
             has_more: search.has_more.unwrap_or(false),
             next_cursor: search.count.map(|c| c.to_string()),

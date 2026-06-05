@@ -1,9 +1,6 @@
-use async_trait::async_trait;
 use crate::error::ImResult;
-use crate::types::{
-    Email, Mailbox, Page,
-    SendEmailRequest, ListEmailsRequest,
-};
+use crate::types::{Email, ListEmailsRequest, Mailbox, Page, SendEmailRequest};
+use async_trait::async_trait;
 
 /// Email service.
 #[async_trait]
